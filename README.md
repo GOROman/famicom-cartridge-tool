@@ -6,6 +6,8 @@ boolean cuts, engraved/embossed text) and export print-ready binary STL files.
 
 **Live app:** https://goroman.github.io/famicom-cartridge-tool/
 
+![Famicom Cartridge Tool — PBR rendering with sticker textures, HDRI environment and bloom](docs/screenshot.png)
+
 ## Features
 
 - **STL import / export** — binary STL, drag & drop or file picker; export top, bottom, or both
