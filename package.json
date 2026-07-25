@@ -1,0 +1,26 @@
+{
+  "name": "famicom-cartridge-tool",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Parametric STL editor for 3D-printable Famicom (Dendy) cartridge shells",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/GOROman/famicom-cartridge-tool.git"
+  },
+  "homepage": "https://goroman.github.io/famicom-cartridge-tool/",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "lil-gui": "^0.21.0",
+    "three": "^0.185.1",
+    "three-bvh-csg": "^0.0.18"
+  },
+  "devDependencies": {
+    "vite": "^8.1.5"
+  }
+}
