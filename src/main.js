@@ -1,3 +1,4 @@
+import * as THREE from 'three'
 import GUI from 'lil-gui'
 import { FontLoader } from 'three/addons/loaders/FontLoader.js'
 import { Viewer, RENDER_MODES } from './viewer.js'
@@ -37,9 +38,13 @@ function setAssemblyPose(mix) {
 
   parts.Top.mesh.rotation.x = Math.PI
   parts.Top.mesh.position.set(0, lerp(PART_GAP / 2, 0), lerp(topH, botH + topH))
-  parts.Bottom.mesh.rotation.x = lerp(Math.PI, 0)
+  // Flip the bottom around Z (not X) so its front edge stays on the same
+  // side as the top shell's when they mate.
+  parts.Bottom.mesh.quaternion.slerpQuaternions(Q_FLIPPED, Q_ASSEMBLED, ease)
   parts.Bottom.mesh.position.set(0, lerp(-PART_GAP / 2, 0), lerp(botH, 0))
 }
+const Q_FLIPPED = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, 0, 0))
+const Q_ASSEMBLED = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI))
 
 let assemblyAnim = null
 function animateAssembly(toAssembled) {
@@ -321,7 +326,23 @@ async function init() {
   const fontPromise = new FontLoader().loadAsync(`${BASE}fonts/helvetiker_bold.typeface.json`)
   await loadDefaults()
 
-  // Default feature setup: label recess on the bottom shell's outer face
+  // Default feature setup. The base Dendy shells have moulded 0.5 mm label
+  // recesses; fill them flush so the label areas are fully parametric.
+  const fillTop = Object.assign(createFeature('Box', parts.Top.bounds), {
+    name: 'Fill Base Label Area', op: 'Add',
+    sizeX: 96, sizeY: 56.6, sizeZ: 2, x: 0, y: 5.1, z: 1, rotZ: 0,
+  })
+  parts.Top.features.push(fillTop)
+  addFeatureFolder(parts.Top, fillTop)
+
+  const fillBottom = Object.assign(createFeature('Box', parts.Bottom.bounds), {
+    name: 'Fill Base Label Area', op: 'Add',
+    sizeX: 107.4, sizeY: 46.8, sizeZ: 2, x: 0, y: 7.5, z: 1, rotZ: 0,
+  })
+  parts.Bottom.features.push(fillBottom)
+  addFeatureFolder(parts.Bottom, fillBottom)
+
+  // Parametric label recess on the bottom shell's outer face
   const recess = createFeature('Label Recess', parts.Bottom.bounds)
   recess.name = 'Back Label Recess'
   parts.Bottom.features.push(recess)
