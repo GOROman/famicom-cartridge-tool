@@ -5,6 +5,29 @@ import * as THREE from 'three'
 
 const texLoader = new THREE.TextureLoader()
 
+// Rounded-rectangle sticker outline with normalised UVs
+function roundedRectGeometry(w, h, r) {
+  r = Math.max(0, Math.min(r, w / 2 - 0.01, h / 2 - 0.01))
+  const x = -w / 2, y = -h / 2
+  const shape = new THREE.Shape()
+  shape.moveTo(x + r, y)
+  shape.lineTo(x + w - r, y)
+  shape.absarc(x + w - r, y + r, r, -Math.PI / 2, 0)
+  shape.lineTo(x + w, y + h - r)
+  shape.absarc(x + w - r, y + h - r, r, 0, Math.PI / 2)
+  shape.lineTo(x + r, y + h)
+  shape.absarc(x + r, y + h - r, r, Math.PI / 2, Math.PI)
+  shape.lineTo(x, y + r)
+  shape.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5)
+  const geo = new THREE.ShapeGeometry(shape, 12)
+  const pos = geo.attributes.position
+  const uv = geo.attributes.uv
+  for (let i = 0; i < pos.count; i++) {
+    uv.setXY(i, pos.getX(i) / w + 0.5, pos.getY(i) / h + 0.5)
+  }
+  return geo
+}
+
 export class StickerManager {
   constructor() {
     this.meshes = new Map() // feature id -> mesh
@@ -50,7 +73,12 @@ export class StickerManager {
     const mesh = this.meshes.get(f.id)
     if (!mesh) return
     mesh.visible = f.enabled && !!f.imageURL
-    mesh.scale.set(f.width, f.height, 1)
+    const shapeKey = `${f.width}|${f.height}|${f.cornerRadius}`
+    if (mesh.userData.shapeKey !== shapeKey) {
+      mesh.geometry.dispose()
+      mesh.geometry = roundedRectGeometry(f.width, f.height, f.cornerRadius ?? 0)
+      mesh.userData.shapeKey = shapeKey
+    }
     mesh.material.opacity = f.opacity
 
     const rotZ = THREE.MathUtils.degToRad(f.rotZ)

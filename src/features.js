@@ -65,6 +65,7 @@ export function createFeature(type, partBounds) {
       return {
         ...base,
         width: 84, height: 53,
+        cornerRadius: 2,
         x: 0, y: 0,
         rotZ: 0,
         opacity: 1,

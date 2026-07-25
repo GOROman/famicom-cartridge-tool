@@ -340,6 +340,7 @@ function addFeatureFolder(part, f) {
       folder.add(f, 'lockAspect').name('Lock Aspect').onChange(on)
       num('width', 'Width', 5, 110)
       num('height', 'Height', 5, 70)
+      num('cornerRadius', 'Corner Radius', 0, 25)
       num('x', 'X', -50, 50)
       num('y', 'Y', -30, 30)
       num('rotZ', 'Rotation°', -180, 180, 1)
@@ -458,7 +459,7 @@ async function init() {
   setStatus('Ready')
 }
 
-window.app = { viewer, parts, setAssemblyPose }
+window.app = { viewer, parts, setAssemblyPose, stickerMgr }
 
 init().catch((err) => {
   console.error(err)
