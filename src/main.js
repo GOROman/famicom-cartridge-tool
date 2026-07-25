@@ -28,20 +28,44 @@ function applyDisplayTransform(part) {
 }
 
 // ---------- Assembly preview ----------
-// mix 0 = exploded side-by-side (outer faces up), 1 = closed cartridge:
-// bottom shell flips onto its back and the top shell lands on top of it.
+// Phased, collision-free choreography (mix 0 = exploded, 1 = standing cart):
+//  1. bottom flips onto its back at the centre while the top slides over it
+//     at hover height
+//  2. the top drops straight down and seats onto the bottom (rims overlap)
+//  3. the closed cartridge tips up to stand on its front edge
+const SEAT_OVERLAP = 2 // mm of rim engagement when fully seated
 function setAssemblyPose(mix) {
-  const ease = mix * mix * (3 - 2 * mix) // smoothstep
   const topH = parts.Top.bounds.max.z || 0
   const botH = parts.Bottom.bounds.max.z || 0
-  const lerp = (a, b) => a + (b - a) * ease
+  const ph = (a, b) => {
+    const u = Math.min(1, Math.max(0, (mix - a) / (b - a)))
+    return u * u * (3 - 2 * u)
+  }
+  const f1 = ph(0, 0.34)    // flip + slide to centre
+  const f2 = ph(0.36, 0.58) // top drops and seats
+  const f3 = ph(0.64, 1)    // stand up
 
-  parts.Top.mesh.rotation.x = Math.PI
-  parts.Top.mesh.position.set(0, lerp(PART_GAP / 2, 0), lerp(topH, botH + topH))
-  // Flip the bottom around Z (not X) so its front edge stays on the same
-  // side as the top shell's when they mate.
-  parts.Bottom.mesh.quaternion.slerpQuaternions(Q_FLIPPED, Q_ASSEMBLED, ease)
-  parts.Bottom.mesh.position.set(0, lerp(-PART_GAP / 2, 0), lerp(botH, 0))
+  const hoverZ = botH + topH + 16
+  const seatZ = botH + topH - SEAT_OVERLAP
+
+  parts.Bottom.mesh.quaternion.slerpQuaternions(Q_FLIPPED, Q_ASSEMBLED, f1)
+  const bp = new THREE.Vector3(0, -PART_GAP / 2 * (1 - f1), botH * (1 - f1))
+
+  parts.Top.mesh.quaternion.copy(Q_FLIPPED)
+  const tp = new THREE.Vector3(0, PART_GAP / 2 * (1 - f1),
+    topH + (hoverZ - topH) * f1 - (hoverZ - seatZ) * f2)
+
+  if (f3 > 0) {
+    const q = new THREE.Quaternion()
+      .setFromAxisAngle(new THREE.Vector3(1, 0, 0), f3 * Math.PI / 2)
+    const pivot = new THREE.Vector3(0, parts.Bottom.bounds.min.y, 0)
+    for (const [mesh, p] of [[parts.Bottom.mesh, bp], [parts.Top.mesh, tp]]) {
+      p.sub(pivot).applyQuaternion(q).add(pivot)
+      mesh.quaternion.premultiply(q)
+    }
+  }
+  parts.Bottom.mesh.position.copy(bp)
+  parts.Top.mesh.position.copy(tp)
 }
 const Q_FLIPPED = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, 0, 0))
 const Q_ASSEMBLED = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI))
@@ -51,7 +75,7 @@ function animateAssembly(toAssembled) {
   if (assemblyAnim) cancelAnimationFrame(assemblyAnim.raf)
   const from = assemblyAnim ? assemblyAnim.mix : (toAssembled ? 0 : 1)
   const start = performance.now()
-  const DURATION = 900
+  const DURATION = 1300
   const step = (now) => {
     const t = Math.min(1, (now - start) / DURATION)
     const mix = toAssembled ? from + (1 - from) * t : from * (1 - t)

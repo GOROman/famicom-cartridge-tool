@@ -64,7 +64,7 @@ export class Viewer {
     this.ground.receiveShadow = true
     this.scene.add(this.ground)
 
-    this.grid = new THREE.GridHelper(400, 40, 0x444455, 0x2a2a33)
+    this.grid = new THREE.GridHelper(400, 40, 0xccccdd, 0x888899)
     this.grid.position.y = -0.01
     this.scene.add(this.grid)
 
