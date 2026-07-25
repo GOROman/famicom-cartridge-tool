@@ -67,7 +67,7 @@ export function createFeature(type, partBounds) {
         width: 84, height: 53,
         cornerRadius: 2,
         x: 0, y: 0,
-        rotZ: 0,
+        rotZ: 180,
         opacity: 1,
         lockAspect: true,
         face: 'Bottom',
