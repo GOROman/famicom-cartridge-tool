@@ -9,7 +9,7 @@ boolean cuts, engraved/embossed text) and export print-ready binary STL files.
 ## Features
 
 - **STL import / export** — binary STL, drag & drop or file picker; export top, bottom, or both
-- **Parametric feature stack** (non-destructive, per part, CSG via [three-bvh-csg](https://github.com/gkjohnson/three-bvh-csg))
+- **Parametric feature stack** (non-destructive, per part, CSG via [Manifold](https://github.com/elalish/manifold) — output is guaranteed watertight, so exported STLs import cleanly into slicers)
   - **Groove** — axis, position, width, depth, length, count and spacing
   - **Label Recess** — rounded-rectangle sticker recess with size, depth, corner radius, on/off; drag the corner/center handles in the viewport to resize and move it
   - **Box / Cylinder** — generic boolean add/subtract primitives

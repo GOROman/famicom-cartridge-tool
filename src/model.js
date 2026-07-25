@@ -1,20 +1,18 @@
 import * as THREE from 'three'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
-import { Brush, Evaluator, ADDITION, SUBTRACTION } from 'three-bvh-csg'
-import { buildFeatureGeometry } from './features.js'
-
-const evaluator = new Evaluator()
-evaluator.attributes = ['position', 'normal']
-evaluator.useGroups = false
+import { geometryToManifold, manifoldToGeometry } from './csg.js'
+import { buildFeatureManifolds } from './features.js'
 
 const stlLoader = new STLLoader()
 
 // One cartridge half (top or bottom shell): a base STL geometry plus a
-// non-destructive stack of parametric features, re-evaluated with CSG.
+// non-destructive stack of parametric features, re-evaluated with Manifold
+// CSG (watertight by construction — safe for slicers).
 export class Part {
   constructor(name) {
     this.name = name
     this.baseGeometry = null
+    this.baseManifold = null
     this.features = []
     this.mesh = new THREE.Mesh(new THREE.BufferGeometry())
     this.mesh.visible = false
@@ -22,8 +20,8 @@ export class Part {
     this.lastBuildMs = 0
   }
 
-  async loadURL(url) {
-    this.setBaseGeometry(await stlLoader.loadAsync(url))
+  async loadURL(url, onProgress) {
+    this.setBaseGeometry(await stlLoader.loadAsync(url, onProgress))
   }
 
   loadArrayBuffer(buffer) {
@@ -35,28 +33,29 @@ export class Part {
     this.baseGeometry = geo
     this.baseGeometry.computeBoundingBox()
     this.bounds.copy(this.baseGeometry.boundingBox)
+    this.baseManifold?.delete()
+    this.baseManifold = geometryToManifold(geo)
     this.mesh.visible = true
   }
 
   rebuild(font) {
-    if (!this.baseGeometry) return
+    if (!this.baseManifold) return
     const t0 = performance.now()
-    let result = new Brush(this.baseGeometry)
-    result.updateMatrixWorld()
+    let result = this.baseManifold
 
     for (const f of this.features) {
       if (!f.enabled) continue
-      const built = buildFeatureGeometry(f, this.bounds, font)
-      if (!built) continue
-      for (const { geometry, subtract } of [].concat(built)) {
-        const tool = new Brush(geometry)
-        tool.updateMatrixWorld()
-        result = evaluator.evaluate(result, tool, subtract ? SUBTRACTION : ADDITION)
+      for (const { manifold: tool, subtract } of buildFeatureManifolds(f, this.bounds, font)) {
+        const next = subtract ? result.subtract(tool) : result.add(tool)
+        tool.delete()
+        if (result !== this.baseManifold) result.delete()
+        result = next
       }
     }
 
     this.mesh.geometry.dispose()
-    this.mesh.geometry = result.geometry
+    this.mesh.geometry = manifoldToGeometry(result)
+    if (result !== this.baseManifold) result.delete()
     this.lastBuildMs = performance.now() - t0
   }
 

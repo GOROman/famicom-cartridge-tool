@@ -68,6 +68,12 @@ export class Viewer {
     this.grid.position.y = -0.01
     this.scene.add(this.grid)
 
+    // Model-space axes: X red, Y green, Z blue (Z-up, matches STL space)
+    this.axes = new THREE.AxesHelper(70)
+    this.axes.material.depthTest = false
+    this.axes.renderOrder = 900
+    this.modelGroup.add(this.axes)
+
     // Environment map (procedural room by default, replaceable with a .hdr file)
     this.pmrem = new THREE.PMREMGenerator(this.renderer)
     this.roomEnv = this.pmrem.fromScene(new RoomEnvironment(), 0.04).texture
@@ -83,7 +89,7 @@ export class Viewer {
         clearcoat: 0.15, clearcoatRoughness: 0.5,
       }),
     }
-    this.renderMode = 'PBR (HDR)'
+    this.renderMode = 'Simple'
     this.shadowsEnabled = true
 
     // Screen-space ambient occlusion (GTAO) post-processing chain
@@ -94,7 +100,12 @@ export class Viewer {
     this.setAOParams({ radius: 4, intensity: 1 })
     this.composer.addPass(this.aoPass)
     this.composer.addPass(new OutputPass())
-    this.aoEnabled = true
+    this.aoEnabled = false
+
+    // FPS counter
+    this.fpsElement = null
+    let frames = 0
+    let fpsT0 = performance.now()
 
     window.addEventListener('resize', () => this.onResize())
     this.renderer.setAnimationLoop(() => {
@@ -103,6 +114,15 @@ export class Viewer {
         this.composer.render()
       } else {
         this.renderer.render(this.scene, this.camera)
+      }
+      frames++
+      const now = performance.now()
+      if (now - fpsT0 >= 500) {
+        if (this.fpsElement) {
+          this.fpsElement.textContent = `${Math.round(frames * 1000 / (now - fpsT0))} FPS`
+        }
+        frames = 0
+        fpsT0 = now
       }
     })
     this.applyRenderMode()

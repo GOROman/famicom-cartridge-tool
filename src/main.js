@@ -6,6 +6,7 @@ import { Part } from './model.js'
 import { FEATURE_TYPES, createFeature } from './features.js'
 import { exportSTL } from './exporter.js'
 import { RecessGizmoManager } from './gizmo.js'
+import { initManifold } from './csg.js'
 
 const BASE = import.meta.env.BASE_URL
 const statusEl = document.getElementById('status')
@@ -59,8 +60,11 @@ function setAssemblyPose(mix) {
     const q = new THREE.Quaternion()
       .setFromAxisAngle(new THREE.Vector3(1, 0, 0), -f3 * Math.PI / 2)
     const pivot = new THREE.Vector3(0, parts.Bottom.bounds.max.y, 0)
+    // once upright, slide the cart so it stands centred on the origin
+    const originShift = -(pivot.y + seatZ / 2) * f3
     for (const [mesh, p] of [[parts.Bottom.mesh, bp], [parts.Top.mesh, tp]]) {
       p.sub(pivot).applyQuaternion(q).add(pivot)
+      p.y += originShift
       mesh.quaternion.premultiply(q)
     }
   }
@@ -102,7 +106,7 @@ const gizmoMgr = new RecessGizmoManager(viewer, {
 const settings = {
   renderMode: viewer.renderMode,
   shadows: true,
-  ao: true,
+  ao: false,
   aoRadius: 4,
   aoIntensity: 1,
   bodyColor: '#d8b25a',
@@ -336,18 +340,44 @@ window.addEventListener('drop', async (e) => {
 })
 
 // ---------- Startup ----------
+const loadingEl = document.getElementById('loading')
+const loadingBar = document.getElementById('loading-bar')
+const loadingStep = document.getElementById('loading-step')
+const progress = { wasm: 0, top: 0, bottom: 0, font: 0 }
+const WEIGHTS = { wasm: 0.2, top: 0.3, bottom: 0.35, font: 0.15 }
+function reportProgress(key, frac, label) {
+  progress[key] = Math.min(1, frac)
+  let total = 0
+  for (const k of Object.keys(WEIGHTS)) total += WEIGHTS[k] * progress[k]
+  loadingBar.style.width = `${Math.round(total * 100)}%`
+  if (label) loadingStep.textContent = label
+}
+const onFileProgress = (key, label) => (e) => {
+  if (e.total) reportProgress(key, e.loaded / e.total, label)
+}
+
 async function loadDefaults() {
   await Promise.all([
-    parts.Top.loadURL(`${BASE}models/Dendy_top.stl`),
-    parts.Bottom.loadURL(`${BASE}models/Dendy_bottom.stl`),
+    parts.Top.loadURL(`${BASE}models/Dendy_top.stl`,
+      onFileProgress('top', 'Loading Dendy_top.stl…')).then(() => reportProgress('top', 1)),
+    parts.Bottom.loadURL(`${BASE}models/Dendy_bottom.stl`,
+      onFileProgress('bottom', 'Loading Dendy_bottom.stl…')).then(() => reportProgress('bottom', 1)),
   ])
   applyDisplayTransform(parts.Top)
   applyDisplayTransform(parts.Bottom)
 }
 
 async function init() {
-  setStatus('Loading base models…')
-  const fontPromise = new FontLoader().loadAsync(`${BASE}fonts/helvetiker_bold.typeface.json`)
+  setStatus('Loading…')
+  viewer.fpsElement = document.getElementById('fps')
+  const fontPromise = new FontLoader()
+    .loadAsync(`${BASE}fonts/helvetiker_bold.typeface.json`, onFileProgress('font', 'Loading font…'))
+    .then((f) => { reportProgress('font', 1); return f })
+
+  reportProgress('wasm', 0.1, 'Initialising CSG engine (Manifold)…')
+  await initManifold()
+  reportProgress('wasm', 1, 'Loading base models…')
+
   await loadDefaults()
 
   // Default feature setup. The base Dendy shells have moulded 0.5 mm label
@@ -372,14 +402,17 @@ async function init() {
   parts.Bottom.features.push(recess)
   addFeatureFolder(parts.Bottom, recess)
 
+  loadingStep.textContent = 'Building geometry…'
   rebuildAll()
   font = await fontPromise
+  loadingEl.classList.add('done')
   setStatus('Ready')
 }
 
-window.app = { viewer, parts }
+window.app = { viewer, parts, setAssemblyPose }
 
 init().catch((err) => {
   console.error(err)
   setStatus(`Error: ${err.message}`)
+  loadingStep.textContent = `Error: ${err.message}`
 })
