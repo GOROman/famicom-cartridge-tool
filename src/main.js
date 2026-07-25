@@ -30,6 +30,9 @@ let font = null
 const settings = {
   renderMode: viewer.renderMode,
   shadows: true,
+  ao: true,
+  aoRadius: 4,
+  aoIntensity: 1,
   bodyColor: '#d8b25a',
   envBackground: false,
   activePart: 'Top',
@@ -117,6 +120,9 @@ const gui = new GUI({ title: 'Famicom Cartridge Tool', width: 320 })
 const fView = gui.addFolder('Rendering')
 fView.add(settings, 'renderMode', RENDER_MODES).name('Mode').onChange((v) => viewer.setRenderMode(v))
 fView.add(settings, 'shadows').name('Shadows').onChange((v) => viewer.setShadows(v))
+fView.add(settings, 'ao').name('Ambient Occlusion').onChange((v) => viewer.setAO(v))
+fView.add(settings, 'aoRadius', 0.5, 20, 0.5).name('AO Radius (mm)').onChange((v) => viewer.setAOParams({ radius: v }))
+fView.add(settings, 'aoIntensity', 0, 2, 0.05).name('AO Intensity').onChange((v) => viewer.setAOParams({ intensity: v }))
 fView.addColor(settings, 'bodyColor').name('Body Color').onChange((v) => viewer.setBodyColor(v))
 fView.add(settings, 'envBackground').name('HDR Background').onChange((v) => viewer.setEnvBackground(v))
 fView.add(settings, 'loadHDR').name('Load HDR Environment…')

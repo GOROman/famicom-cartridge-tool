@@ -2,6 +2,10 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js'
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 
 export const RENDER_MODES = ['Wireframe', 'Simple', 'PBR (HDR)']
 
@@ -82,12 +86,46 @@ export class Viewer {
     this.renderMode = 'PBR (HDR)'
     this.shadowsEnabled = true
 
+    // Screen-space ambient occlusion (GTAO) post-processing chain
+    this.composer = new EffectComposer(this.renderer)
+    this.composer.addPass(new RenderPass(this.scene, this.camera))
+    this.aoPass = new GTAOPass(this.scene, this.camera,
+      container.clientWidth, container.clientHeight)
+    this.setAOParams({ radius: 4, intensity: 1 })
+    this.composer.addPass(this.aoPass)
+    this.composer.addPass(new OutputPass())
+    this.aoEnabled = true
+
     window.addEventListener('resize', () => this.onResize())
     this.renderer.setAnimationLoop(() => {
       this.controls.update()
-      this.renderer.render(this.scene, this.camera)
+      if (this.aoEnabled && this.renderMode !== 'Wireframe') {
+        this.composer.render()
+      } else {
+        this.renderer.render(this.scene, this.camera)
+      }
     })
     this.applyRenderMode()
+  }
+
+  setAO(enabled) {
+    this.aoEnabled = enabled
+  }
+
+  setAOParams({ radius, intensity }) {
+    if (intensity !== undefined) this.aoPass.blendIntensity = intensity
+    if (radius !== undefined) {
+      // radius is in world units (mm here)
+      this.aoPass.updateGtaoMaterial({
+        radius,
+        distanceExponent: 1,
+        thickness: 1,
+        scale: 1,
+        samples: 16,
+        distanceFallOff: 1,
+        screenSpaceRadius: false,
+      })
+    }
   }
 
   onResize() {
@@ -95,6 +133,7 @@ export class Viewer {
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(w, h)
+    this.composer.setSize(w, h)
   }
 
   get activeEnv() {
