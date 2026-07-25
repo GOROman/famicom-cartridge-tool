@@ -109,8 +109,13 @@ const settings = {
   renderMode: viewer.renderMode,
   shadows: true,
   ao: false,
-  aoRadius: 4,
-  aoIntensity: 1,
+  aoRadius: 6,
+  aoIntensity: 1.5,
+  exposure: 1,
+  bloom: false,
+  bloomStrength: 0.25,
+  bloomThreshold: 1.0,
+  bloomRadius: 0.3,
   bodyColor: '#d8b25a',
   envBackground: false,
   hdriPreset: 'Room (Default)',
@@ -202,7 +207,12 @@ fView.add(settings, 'renderMode', RENDER_MODES).name('Mode').onChange((v) => vie
 fView.add(settings, 'shadows').name('Shadows').onChange((v) => viewer.setShadows(v))
 fView.add(settings, 'ao').name('Ambient Occlusion').onChange((v) => viewer.setAO(v))
 fView.add(settings, 'aoRadius', 0.5, 20, 0.5).name('AO Radius (mm)').onChange((v) => viewer.setAOParams({ radius: v }))
-fView.add(settings, 'aoIntensity', 0, 2, 0.05).name('AO Intensity').onChange((v) => viewer.setAOParams({ intensity: v }))
+fView.add(settings, 'aoIntensity', 0, 3, 0.05).name('AO Intensity').onChange((v) => viewer.setAOParams({ intensity: v }))
+fView.add(settings, 'exposure', 0.1, 3, 0.05).name('Exposure').onChange((v) => viewer.setExposure(v))
+fView.add(settings, 'bloom').name('Bloom').onChange((v) => viewer.setBloom({ enabled: v }))
+fView.add(settings, 'bloomStrength', 0, 1.5, 0.05).name('Bloom Strength').onChange((v) => viewer.setBloom({ strength: v }))
+fView.add(settings, 'bloomThreshold', 0, 2, 0.01).name('Bloom Threshold').onChange((v) => viewer.setBloom({ threshold: v }))
+fView.add(settings, 'bloomRadius', 0, 1, 0.01).name('Bloom Radius').onChange((v) => viewer.setBloom({ radius: v }))
 fView.addColor(settings, 'bodyColor').name('Body Color').onChange((v) => viewer.setBodyColor(v))
 const HDRI_PRESETS = {
   'Room (Default)': null,

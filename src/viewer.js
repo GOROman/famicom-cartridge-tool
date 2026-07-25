@@ -5,6 +5,7 @@ import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 
 export const RENDER_MODES = ['Wireframe', 'Simple', 'PBR (HDR)']
@@ -92,13 +93,18 @@ export class Viewer {
     this.renderMode = 'Simple'
     this.shadowsEnabled = true
 
-    // Screen-space ambient occlusion (GTAO) post-processing chain
+    // Post-processing chain: GTAO -> bloom -> tone-mapped output
     this.composer = new EffectComposer(this.renderer)
     this.composer.addPass(new RenderPass(this.scene, this.camera))
     this.aoPass = new GTAOPass(this.scene, this.camera,
       container.clientWidth, container.clientHeight)
-    this.setAOParams({ radius: 4, intensity: 1 })
+    this.setAOParams({ radius: 6, intensity: 1.5 })
     this.composer.addPass(this.aoPass)
+    this.bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(container.clientWidth, container.clientHeight),
+      0.25, 0.3, 1.0)
+    this.bloomPass.enabled = false
+    this.composer.addPass(this.bloomPass)
     this.composer.addPass(new OutputPass())
     this.aoEnabled = false
 
@@ -110,7 +116,9 @@ export class Viewer {
     window.addEventListener('resize', () => this.onResize())
     this.renderer.setAnimationLoop(() => {
       this.controls.update()
-      if (this.aoEnabled && this.renderMode !== 'Wireframe') {
+      const post = (this.aoEnabled || this.bloomPass.enabled) && this.renderMode !== 'Wireframe'
+      if (post) {
+        this.aoPass.enabled = this.aoEnabled
         this.composer.render()
       } else {
         this.renderer.render(this.scene, this.camera)
@@ -138,14 +146,25 @@ export class Viewer {
       // radius is in world units (mm here)
       this.aoPass.updateGtaoMaterial({
         radius,
-        distanceExponent: 1,
-        thickness: 1,
-        scale: 1,
-        samples: 16,
+        distanceExponent: 1.5,
+        thickness: 2,
+        scale: 1.5,
+        samples: 32,
         distanceFallOff: 1,
         screenSpaceRadius: false,
       })
     }
+  }
+
+  setBloom({ enabled, strength, threshold, radius }) {
+    if (enabled !== undefined) this.bloomPass.enabled = enabled
+    if (strength !== undefined) this.bloomPass.strength = strength
+    if (threshold !== undefined) this.bloomPass.threshold = threshold
+    if (radius !== undefined) this.bloomPass.radius = radius
+  }
+
+  setExposure(value) {
+    this.renderer.toneMappingExposure = value
   }
 
   onResize() {
