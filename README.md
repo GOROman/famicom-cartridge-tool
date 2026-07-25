@@ -14,6 +14,7 @@ boolean cuts, engraved/embossed text) and export print-ready binary STL files.
   - **Label Recess** — rounded-rectangle sticker recess with size, depth, corner radius, on/off; drag the corner/center handles in the viewport to resize and move it
   - **Box / Cylinder** — generic boolean add/subtract primitives
   - **Text** — engrave or emboss with size, depth, position, rotation
+  - **Sticker** — import a PNG/JPG (file picker or drag & drop) and place it as a textured label with size/position/rotation/opacity (display-only preview, not exported)
 - **Rendering** — Wireframe / Simple shaded / PBR with HDR environment
   - 4 bundled HDRI presets (Studio, Sunrise, Sunset, Night — CC0 from [Poly Haven](https://polyhaven.com/)) plus a procedural room default, or drop in your own `.hdr`
 - **Shadows** — soft shadow mapping with a toggle

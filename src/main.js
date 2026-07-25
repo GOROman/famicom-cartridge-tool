@@ -6,6 +6,7 @@ import { Part } from './model.js'
 import { FEATURE_TYPES, createFeature } from './features.js'
 import { exportSTL } from './exporter.js'
 import { RecessGizmoManager } from './gizmo.js'
+import { StickerManager } from './sticker.js'
 import { initManifold } from './csg.js'
 
 const BASE = import.meta.env.BASE_URL
@@ -95,6 +96,7 @@ viewer.modelGroup.add(parts.Top.mesh, parts.Bottom.mesh)
 let font = null
 
 const featureFolderById = new Map()
+const stickerMgr = new StickerManager()
 const gizmoMgr = new RecessGizmoManager(viewer, {
   onChange: (part, f) => {
     featureFolderById.get(f.id)?.controllersRecursive().forEach((c) => c.updateDisplay())
@@ -246,13 +248,23 @@ function addFeatureFolder(part, f) {
   const folder = featureFolders[part.name].addFolder(f.name)
   featureFolderById.set(f.id, folder)
   const isRecess = f.type === 'Label Recess'
+  const isSticker = f.type === 'Sticker'
   const on = () => {
     if (isRecess) gizmoMgr.refresh(f)
+    if (isSticker) {
+      if (f.lockAspect && f._aspect) {
+        f.height = f.width / f._aspect
+        folder.controllersRecursive().forEach((c) => c.updateDisplay())
+      }
+      stickerMgr.update(part, f)
+      return
+    }
     rebuild(part)
   }
   if (isRecess) gizmoMgr.attach(part, f)
   folder.add(f, 'enabled').name('Enabled').onChange((v) => {
     if (isRecess) gizmoMgr.setVisible(f, v && !settings.assemble)
+    if (isSticker) return stickerMgr.update(part, f)
     rebuild(part)
   })
 
@@ -308,10 +320,26 @@ function addFeatureFolder(part, f) {
       num('y', 'Y', -30, 30)
       num('rotZ', 'Rotation°', -180, 180, 1)
       break
+    case 'Sticker':
+      folder.add({ load: () => pickFile('.png,.jpg,.jpeg,.webp', null, async (file) => {
+        await stickerMgr.setImage(part, f, URL.createObjectURL(file), file.name)
+        folder.controllersRecursive().forEach((c) => c.updateDisplay())
+        setStatus(`Sticker image: ${file.name} (display only, not exported)`)
+      }) }, 'load').name('Load Image (PNG/JPG)…')
+      folder.add(f, 'face', { 'Outer (-Z)': 'Bottom', 'Inner (+Z)': 'Top' }).name('Face').onChange(on)
+      folder.add(f, 'lockAspect').name('Lock Aspect').onChange(on)
+      num('width', 'Width', 5, 110)
+      num('height', 'Height', 5, 70)
+      num('x', 'X', -50, 50)
+      num('y', 'Y', -30, 30)
+      num('rotZ', 'Rotation°', -180, 180, 1)
+      num('opacity', 'Opacity', 0, 1, 0.01)
+      break
   }
   folder.add({ remove: () => {
     part.features.splice(part.features.indexOf(f), 1)
     if (isRecess) gizmoMgr.detach(f)
+    if (isSticker) stickerMgr.remove(f)
     featureFolderById.delete(f.id)
     folder.destroy()
     rebuild(part)
@@ -336,6 +364,17 @@ window.addEventListener('drop', async (e) => {
     applyDisplayTransform(part)
     rebuild(part, true)
     setStatus(`Imported ${file.name} into ${part.name}`)
+  } else if (/\.(png|jpe?g|webp)$/i.test(file.name)) {
+    const part = parts[settings.activePart]
+    let f = part.features.findLast((x) => x.type === 'Sticker')
+    if (!f) {
+      f = createFeature('Sticker', part.bounds)
+      part.features.push(f)
+      addFeatureFolder(part, f)
+    }
+    await stickerMgr.setImage(part, f, URL.createObjectURL(file), file.name)
+    featureFolderById.get(f.id)?.controllersRecursive().forEach((c) => c.updateDisplay())
+    setStatus(`Sticker image: ${file.name} on ${part.name} (display only, not exported)`)
   }
 })
 

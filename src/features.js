@@ -5,7 +5,7 @@ import { manifoldAPI, shapesToCrossSection } from './csg.js'
 // cartridge centred on X/Y with its bottom face at Z=0.
 // Builders return Manifold solids (see csg.js) as {manifold, subtract} lists.
 
-export const FEATURE_TYPES = ['Groove', 'Label Recess', 'Box', 'Cylinder', 'Text']
+export const FEATURE_TYPES = ['Groove', 'Label Recess', 'Box', 'Cylinder', 'Text', 'Sticker']
 
 let featureId = 0
 
@@ -60,6 +60,19 @@ export function createFeature(type, partBounds) {
         rotZ: 0,
         face: 'Bottom',
       }
+    case 'Sticker':
+      // Display-only textured label (PNG/JPG); not part of the CSG solid
+      return {
+        ...base,
+        width: 84, height: 53,
+        x: 0, y: 0,
+        rotZ: 0,
+        opacity: 1,
+        lockAspect: true,
+        face: 'Bottom',
+        imageURL: null,
+        imageName: '',
+      }
   }
 }
 
@@ -71,6 +84,7 @@ export function buildFeatureManifolds(f, partBounds, font) {
     case 'Box': return [buildBox(f)]
     case 'Cylinder': return [buildCylinder(f)]
     case 'Text': return buildText(f, partBounds, font)
+    case 'Sticker': return [] // rendered as a textured overlay, not CSG
   }
   return []
 }

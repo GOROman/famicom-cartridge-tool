@@ -220,7 +220,7 @@ export class Viewer {
 
     const mat = this.materials[mode]
     this.modelGroup.traverse((obj) => {
-      if (obj.isMesh && !obj.userData.isGizmo) {
+      if (obj.isMesh && !obj.userData.isGizmo && !obj.userData.isSticker) {
         obj.material = mat
         obj.castShadow = shadows
         obj.receiveShadow = shadows
