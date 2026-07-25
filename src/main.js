@@ -4,6 +4,7 @@ import { Viewer, RENDER_MODES } from './viewer.js'
 import { Part } from './model.js'
 import { FEATURE_TYPES, createFeature } from './features.js'
 import { exportSTL } from './exporter.js'
+import { RecessGizmoManager } from './gizmo.js'
 
 const BASE = import.meta.env.BASE_URL
 const statusEl = document.getElementById('status')
@@ -22,10 +23,52 @@ parts.Bottom.mesh.position.y = -PART_GAP / 2
 function applyDisplayTransform(part) {
   part.mesh.rotation.x = Math.PI
   part.mesh.position.z = part.bounds.max.z
+  if (settings?.assemble) setAssemblyPose(1)
+}
+
+// ---------- Assembly preview ----------
+// mix 0 = exploded side-by-side (outer faces up), 1 = closed cartridge:
+// bottom shell flips onto its back and the top shell lands on top of it.
+function setAssemblyPose(mix) {
+  const ease = mix * mix * (3 - 2 * mix) // smoothstep
+  const topH = parts.Top.bounds.max.z || 0
+  const botH = parts.Bottom.bounds.max.z || 0
+  const lerp = (a, b) => a + (b - a) * ease
+
+  parts.Top.mesh.rotation.x = Math.PI
+  parts.Top.mesh.position.set(0, lerp(PART_GAP / 2, 0), lerp(topH, botH + topH))
+  parts.Bottom.mesh.rotation.x = lerp(Math.PI, 0)
+  parts.Bottom.mesh.position.set(0, lerp(-PART_GAP / 2, 0), lerp(botH, 0))
+}
+
+let assemblyAnim = null
+function animateAssembly(toAssembled) {
+  if (assemblyAnim) cancelAnimationFrame(assemblyAnim.raf)
+  const from = assemblyAnim ? assemblyAnim.mix : (toAssembled ? 0 : 1)
+  const start = performance.now()
+  const DURATION = 900
+  const step = (now) => {
+    const t = Math.min(1, (now - start) / DURATION)
+    const mix = toAssembled ? from + (1 - from) * t : from * (1 - t)
+    setAssemblyPose(mix)
+    assemblyAnim.mix = mix
+    if (t < 1) assemblyAnim.raf = requestAnimationFrame(step)
+    else assemblyAnim = null
+  }
+  assemblyAnim = { mix: from, raf: requestAnimationFrame(step) }
 }
 viewer.modelGroup.add(parts.Top.mesh, parts.Bottom.mesh)
 
 let font = null
+
+const featureFolderById = new Map()
+const gizmoMgr = new RecessGizmoManager(viewer, {
+  onChange: (part, f) => {
+    featureFolderById.get(f.id)?.controllersRecursive().forEach((c) => c.updateDisplay())
+    rebuild(part)
+  },
+  onCommit: (part) => rebuild(part, true),
+})
 
 const settings = {
   renderMode: viewer.renderMode,
@@ -39,6 +82,7 @@ const settings = {
   activePart: 'Top',
   showTop: true,
   showBottom: true,
+  assemble: false,
   loadTopSTL: () => pickFile('.stl', (buf) => { parts.Top.loadArrayBuffer(buf); applyDisplayTransform(parts.Top); rebuild(parts.Top) }),
   loadBottomSTL: () => pickFile('.stl', (buf) => { parts.Bottom.loadArrayBuffer(buf); applyDisplayTransform(parts.Bottom); rebuild(parts.Bottom) }),
   loadHDR: () => pickFile('.hdr', null, async (file) => {
@@ -144,6 +188,10 @@ fView.add(settings, 'loadHDR').name('Load Custom HDR…')
 
 const fParts = gui.addFolder('Parts')
 fParts.add(settings, 'showTop').name('Show Top').onChange((v) => { parts.Top.mesh.visible = v && !!parts.Top.baseGeometry })
+fParts.add(settings, 'assemble').name('Assembly Preview').onChange((v) => {
+  animateAssembly(v)
+  gizmoMgr.setAllVisible(!v)
+})
 fParts.add(settings, 'showBottom').name('Show Bottom').onChange((v) => { parts.Bottom.mesh.visible = v && !!parts.Bottom.baseGeometry })
 fParts.add(settings, 'loadTopSTL').name('Import Top STL…')
 fParts.add(settings, 'loadBottomSTL').name('Import Bottom STL…')
@@ -163,8 +211,17 @@ fExport.add(settings, 'exportBoth').name('Export Both STL')
 
 function addFeatureFolder(part, f) {
   const folder = featureFolders[part.name].addFolder(f.name)
-  const on = () => rebuild(part)
-  folder.add(f, 'enabled').name('Enabled').onChange(on)
+  featureFolderById.set(f.id, folder)
+  const isRecess = f.type === 'Label Recess'
+  const on = () => {
+    if (isRecess) gizmoMgr.refresh(f)
+    rebuild(part)
+  }
+  if (isRecess) gizmoMgr.attach(part, f)
+  folder.add(f, 'enabled').name('Enabled').onChange((v) => {
+    if (isRecess) gizmoMgr.setVisible(f, v && !settings.assemble)
+    rebuild(part)
+  })
 
   const num = (key, label, min, max, step = 0.1) =>
     folder.add(f, key, min, max, step).name(label).onChange(on)
@@ -221,6 +278,8 @@ function addFeatureFolder(part, f) {
   }
   folder.add({ remove: () => {
     part.features.splice(part.features.indexOf(f), 1)
+    if (isRecess) gizmoMgr.detach(f)
+    featureFolderById.delete(f.id)
     folder.destroy()
     rebuild(part)
   } }, 'remove').name('✕ Remove')
