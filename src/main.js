@@ -57,8 +57,8 @@ function setAssemblyPose(mix) {
 
   if (f3 > 0) {
     const q = new THREE.Quaternion()
-      .setFromAxisAngle(new THREE.Vector3(1, 0, 0), f3 * Math.PI / 2)
-    const pivot = new THREE.Vector3(0, parts.Bottom.bounds.min.y, 0)
+      .setFromAxisAngle(new THREE.Vector3(1, 0, 0), -f3 * Math.PI / 2)
+    const pivot = new THREE.Vector3(0, parts.Bottom.bounds.max.y, 0)
     for (const [mesh, p] of [[parts.Bottom.mesh, bp], [parts.Top.mesh, tp]]) {
       p.sub(pivot).applyQuaternion(q).add(pivot)
       mesh.quaternion.premultiply(q)
