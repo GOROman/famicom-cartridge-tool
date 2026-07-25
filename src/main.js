@@ -35,6 +35,7 @@ const settings = {
   aoIntensity: 1,
   bodyColor: '#d8b25a',
   envBackground: false,
+  hdriPreset: 'Room (Default)',
   activePart: 'Top',
   showTop: true,
   showBottom: true,
@@ -124,8 +125,22 @@ fView.add(settings, 'ao').name('Ambient Occlusion').onChange((v) => viewer.setAO
 fView.add(settings, 'aoRadius', 0.5, 20, 0.5).name('AO Radius (mm)').onChange((v) => viewer.setAOParams({ radius: v }))
 fView.add(settings, 'aoIntensity', 0, 2, 0.05).name('AO Intensity').onChange((v) => viewer.setAOParams({ intensity: v }))
 fView.addColor(settings, 'bodyColor').name('Body Color').onChange((v) => viewer.setBodyColor(v))
+const HDRI_PRESETS = {
+  'Room (Default)': null,
+  'Studio': 'studio_small_03_1k.hdr',
+  'Sunrise': 'spruit_sunrise_1k.hdr',
+  'Sunset': 'venice_sunset_1k.hdr',
+  'Night': 'moonless_golf_1k.hdr',
+}
+fView.add(settings, 'hdriPreset', Object.keys(HDRI_PRESETS)).name('HDRI Preset').onChange(async (v) => {
+  const file = HDRI_PRESETS[v]
+  if (!file) { viewer.clearHDR(); setStatus('Environment: procedural room'); return }
+  setStatus(`Loading HDRI: ${v}…`)
+  await viewer.loadHDR(`${BASE}hdri/${file}`)
+  setStatus(`Environment: ${v}`)
+})
 fView.add(settings, 'envBackground').name('HDR Background').onChange((v) => viewer.setEnvBackground(v))
-fView.add(settings, 'loadHDR').name('Load HDR Environment…')
+fView.add(settings, 'loadHDR').name('Load Custom HDR…')
 
 const fParts = gui.addFolder('Parts')
 fParts.add(settings, 'showTop').name('Show Top').onChange((v) => { parts.Top.mesh.visible = v && !!parts.Top.baseGeometry })

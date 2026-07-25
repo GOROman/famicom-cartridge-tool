@@ -163,8 +163,17 @@ export class Viewer {
   async loadHDR(url) {
     const tex = await new RGBELoader().loadAsync(url)
     tex.mapping = THREE.EquirectangularReflectionMapping
+    this.hdrEnvRaw?.dispose()
     this.hdrEnvRaw = tex
     this.hdrEnv = this.pmrem.fromEquirectangular(tex).texture
+    this.applyRenderMode()
+  }
+
+  // Back to the procedural room environment
+  clearHDR() {
+    this.hdrEnvRaw?.dispose()
+    this.hdrEnvRaw = null
+    this.hdrEnv = null
     this.applyRenderMode()
   }
 
