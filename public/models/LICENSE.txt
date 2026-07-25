@@ -1,0 +1,9 @@
+Dendy_top.stl and Dendy_bottom.stl (renamed from Dendy.stl):
+
+"Dendy (Famicom) cartridge" by 5rw
+https://www.thingiverse.com/thing:3357677
+Licensed under Creative Commons - Attribution (CC BY)
+https://creativecommons.org/licenses/by/4.0/
+
+Changes: Dendy.stl renamed to Dendy_bottom.stl. No geometry modified in the
+bundled files; the app applies user-controlled CSG edits at runtime.

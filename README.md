@@ -30,6 +30,16 @@ npm run build   # production build into dist/
 
 Deployed automatically to GitHub Pages via GitHub Actions on push to `main`.
 
-## Base model
+## Base model — attribution
 
-Bundled base shells are from [Dendy (Famicom) cartridge](https://www.thingiverse.com/thing:3357677) (Thingiverse #3357677). Units are millimetres, Z-up.
+The bundled base shells in `public/models/` are
+["Dendy (Famicom) cartridge"](https://www.thingiverse.com/thing:3357677) (Thingiverse #3357677)
+by [5rw](https://www.thingiverse.com/5rw), licensed under
+[Creative Commons — Attribution (CC BY)](https://creativecommons.org/licenses/by/4.0/).
+
+Changes made: files renamed (`Dendy.stl` → `Dendy_bottom.stl`); the app applies
+user-controlled CSG modifications (label-area fill, recesses, grooves, text, etc.)
+at runtime. Units are millimetres, Z-up.
+
+The bundled HDRI environments in `public/hdri/` are CC0 from [Poly Haven](https://polyhaven.com/).
+The tool's own source code is MIT licensed.
