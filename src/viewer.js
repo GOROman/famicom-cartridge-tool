@@ -194,6 +194,12 @@ export class Viewer {
     this.materials['PBR (HDR)'].color.set(hex)
   }
 
+  // Cartridge plastic PBR parameters (independent of the sticker material)
+  setPlasticParams(params) {
+    Object.assign(this.materials['PBR (HDR)'], params)
+    this.materials['PBR (HDR)'].needsUpdate = true
+  }
+
   setEnvBackground(show) {
     this.showEnvBackground = show
     this.applyRenderMode()

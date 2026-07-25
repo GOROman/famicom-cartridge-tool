@@ -117,6 +117,10 @@ const settings = {
   bloomThreshold: 1.0,
   bloomRadius: 0.3,
   bodyColor: '#d8b25a',
+  plasticRoughness: 0.45,
+  plasticClearcoat: 0.15,
+  stickerRoughness: 0.35,
+  stickerClearcoat: 0.4,
   envBackground: false,
   hdriPreset: 'Room (Default)',
   activePart: 'Top',
@@ -214,6 +218,13 @@ fView.add(settings, 'bloomStrength', 0, 1.5, 0.05).name('Bloom Strength').onChan
 fView.add(settings, 'bloomThreshold', 0, 2, 0.01).name('Bloom Threshold').onChange((v) => viewer.setBloom({ threshold: v }))
 fView.add(settings, 'bloomRadius', 0, 1, 0.01).name('Bloom Radius').onChange((v) => viewer.setBloom({ radius: v }))
 fView.addColor(settings, 'bodyColor').name('Body Color').onChange((v) => viewer.setBodyColor(v))
+
+const fMat = fView.addFolder('Materials (PBR)')
+fMat.add(settings, 'plasticRoughness', 0, 1, 0.01).name('Plastic Roughness').onChange((v) => viewer.setPlasticParams({ roughness: v }))
+fMat.add(settings, 'plasticClearcoat', 0, 1, 0.01).name('Plastic Clearcoat').onChange((v) => viewer.setPlasticParams({ clearcoat: v }))
+fMat.add(settings, 'stickerRoughness', 0, 1, 0.01).name('Sticker Roughness').onChange((v) => stickerMgr.setMaterialParams({ roughness: v }))
+fMat.add(settings, 'stickerClearcoat', 0, 1, 0.01).name('Sticker Clearcoat').onChange((v) => stickerMgr.setMaterialParams({ clearcoat: v }))
+fMat.close()
 const HDRI_PRESETS = {
   'Room (Default)': null,
   'Studio': 'studio_small_03_1k.hdr',

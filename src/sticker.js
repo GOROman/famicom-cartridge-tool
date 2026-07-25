@@ -31,6 +31,16 @@ function roundedRectGeometry(w, h, r) {
 export class StickerManager {
   constructor() {
     this.meshes = new Map() // feature id -> mesh
+    // Glossy laminated-paper look, distinct from the cartridge plastic
+    this.materialParams = { roughness: 0.35, clearcoat: 0.4, clearcoatRoughness: 0.25 }
+  }
+
+  setMaterialParams(params) {
+    Object.assign(this.materialParams, params)
+    for (const mesh of this.meshes.values()) {
+      Object.assign(mesh.material, this.materialParams)
+      mesh.material.needsUpdate = true
+    }
   }
 
   async setImage(part, f, url, name) {
@@ -56,8 +66,8 @@ export class StickerManager {
     if (!mesh) {
       mesh = new THREE.Mesh(
         new THREE.PlaneGeometry(1, 1),
-        new THREE.MeshStandardMaterial({
-          roughness: 0.55, metalness: 0,
+        new THREE.MeshPhysicalMaterial({
+          ...this.materialParams, metalness: 0,
           transparent: true, opacity: f.opacity,
           polygonOffset: true, polygonOffsetFactor: -1,
         }))
