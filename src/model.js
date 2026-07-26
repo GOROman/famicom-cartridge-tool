@@ -54,6 +54,8 @@ export class Part {
     }
 
     this.mesh.geometry.dispose()
+    this.exportGeometry?.dispose()
+    this.exportGeometry = null // mesh.geometry IS the export geometry again
     this.mesh.geometry = manifoldToGeometry(result)
     if (result !== this.baseManifold) result.delete()
     this.lastBuildMs = performance.now() - t0

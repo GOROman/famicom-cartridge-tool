@@ -7,6 +7,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js'
 
 export const RENDER_MODES = ['Wireframe', 'Simple', 'PBR (HDR)']
 
@@ -106,6 +107,10 @@ export class Viewer {
     this.bloomPass.enabled = false
     this.composer.addPass(this.bloomPass)
     this.composer.addPass(new OutputPass())
+    // SMAA after tone mapping — the composer path bypasses MSAA, so this
+    // restores anti-aliasing when AO/bloom post-processing is active
+    this.smaaPass = new SMAAPass(container.clientWidth, container.clientHeight)
+    this.composer.addPass(this.smaaPass)
     this.aoEnabled = false
 
     // FPS counter
@@ -165,6 +170,18 @@ export class Viewer {
 
   setExposure(value) {
     this.renderer.toneMappingExposure = value
+  }
+
+  setAntialias(enabled) {
+    this.smaaPass.enabled = enabled
+  }
+
+  // Enable/disable baked-AO vertex colors on the shared body materials
+  setVertexColors(enabled) {
+    for (const mode of ['Simple', 'PBR (HDR)']) {
+      this.materials[mode].vertexColors = enabled
+      this.materials[mode].needsUpdate = true
+    }
   }
 
   onResize() {

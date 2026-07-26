@@ -20,7 +20,8 @@ boolean cuts, engraved/embossed text) and export print-ready binary STL files.
 - **Rendering** — Wireframe / Simple shaded / PBR with HDR environment
   - 4 bundled HDRI presets (Studio, Sunrise, Sunset, Night — CC0 from [Poly Haven](https://polyhaven.com/)) plus a procedural room default, or drop in your own `.hdr`
 - **Shadows** — soft shadow mapping with a toggle
-- **Ambient occlusion** — GTAO post-processing with radius/intensity controls
+- **Ambient occlusion** — GTAO post-processing with radius/intensity controls, plus a ray-traced **AO bake** (hemisphere sampling into vertex colors, view-independent like a lightmap)
+- **Anti-aliasing** — MSAA in direct rendering, SMAA in the post-processing chain
 - **Assembly preview** — toggle animates the two shells closing into a complete cartridge
 
 ## Development

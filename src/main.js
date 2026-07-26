@@ -8,6 +8,7 @@ import { exportSTL } from './exporter.js'
 import { RecessGizmoManager } from './gizmo.js'
 import { StickerManager } from './sticker.js'
 import { initManifold } from './csg.js'
+import { bakeAO, clearBakedAO, subdivideForAO } from './aobake.js'
 
 const BASE = import.meta.env.BASE_URL
 const statusEl = document.getElementById('status')
@@ -94,6 +95,7 @@ function animateAssembly(toAssembled) {
 viewer.modelGroup.add(parts.Top.mesh, parts.Bottom.mesh)
 
 let font = null
+let bakeInProgress = false
 
 const featureFolderById = new Map()
 const stickerMgr = new StickerManager()
@@ -112,6 +114,34 @@ const settings = {
   aoRadius: 6,
   aoIntensity: 1.5,
   exposure: 1,
+  antialias: true,
+  bakeSamples: 32,
+  bakedAO: false,
+  bakeAONow: async () => {
+    if (bakeInProgress) return
+    bakeInProgress = true
+    try {
+      for (const part of Object.values(parts)) {
+        if (!part.baseGeometry) continue
+        // bake on a subdivided display copy; keep the clean export geometry
+        if (!part.exportGeometry) {
+          part.exportGeometry = part.mesh.geometry
+          part.mesh.geometry = subdivideForAO(part.exportGeometry)
+        }
+        await bakeAO(part.mesh.geometry, {
+          samples: settings.bakeSamples,
+          onProgress: (p) => setStatus(`Baking AO (${part.name}): ${Math.round(p * 100)}%`),
+        })
+      }
+      viewer.applyRenderMode()
+      settings.bakedAO = true
+      viewer.setVertexColors(true)
+      gui.controllersRecursive().forEach((c) => c.updateDisplay())
+      setStatus('Baked AO applied (vertex colors)')
+    } finally {
+      bakeInProgress = false
+    }
+  },
   bloom: false,
   bloomStrength: 0.25,
   bloomThreshold: 1.0,
@@ -172,6 +202,14 @@ function rebuild(part, immediate = false) {
   const run = () => {
     part.rebuild(font)
     viewer.applyRenderMode()
+    if (settings.bakedAO) {
+      // geometry changed — the baked vertex colors are gone
+      settings.bakedAO = false
+      viewer.setVertexColors(false)
+      gui.controllersRecursive().forEach((c) => c.updateDisplay())
+      setStatus(`${part.name} rebuilt in ${part.lastBuildMs.toFixed(0)} ms — baked AO cleared, re-bake if needed`)
+      return
+    }
     setStatus(`${part.name} rebuilt in ${part.lastBuildMs.toFixed(0)} ms`)
   }
   if (immediate) run()
@@ -190,7 +228,7 @@ function doExport(names) {
   for (const name of names) {
     const p = parts[name]
     if (!p.baseGeometry) continue
-    const g = p.mesh.geometry.clone()
+    const g = (p.exportGeometry ?? p.mesh.geometry).clone()
     if (names.length > 1) {
       g.translate(0, offset, 0)
       offset -= PART_GAP
@@ -213,6 +251,30 @@ fView.add(settings, 'ao').name('Ambient Occlusion').onChange((v) => viewer.setAO
 fView.add(settings, 'aoRadius', 0.5, 20, 0.5).name('AO Radius (mm)').onChange((v) => viewer.setAOParams({ radius: v }))
 fView.add(settings, 'aoIntensity', 0, 3, 0.05).name('AO Intensity').onChange((v) => viewer.setAOParams({ intensity: v }))
 fView.add(settings, 'exposure', 0.1, 3, 0.05).name('Exposure').onChange((v) => viewer.setExposure(v))
+fView.add(settings, 'antialias').name('Anti-Aliasing (SMAA)').onChange((v) => viewer.setAntialias(v))
+
+const fBake = fView.addFolder('Baked AO (Raytraced)')
+fBake.add(settings, 'bakeSamples', 8, 128, 8).name('Samples')
+fBake.add(settings, 'bakeAONow').name('⚡ Bake AO Now')
+fBake.add(settings, 'bakedAO').name('Use Baked AO').onChange((v) => {
+  if (!v) {
+    for (const part of Object.values(parts)) {
+      clearBakedAO(part.mesh.geometry)
+      if (part.exportGeometry) {
+        // restore the clean un-subdivided geometry
+        part.mesh.geometry.dispose()
+        part.mesh.geometry = part.exportGeometry
+        part.exportGeometry = null
+      }
+    }
+    viewer.applyRenderMode()
+  }
+  viewer.setVertexColors(v)
+  if (v && ![...Object.values(parts)].some((p) => p.mesh.geometry.getAttribute('color'))) {
+    settings.bakeAONow()
+  }
+})
+fBake.close()
 fView.add(settings, 'bloom').name('Bloom').onChange((v) => viewer.setBloom({ enabled: v }))
 fView.add(settings, 'bloomStrength', 0, 1.5, 0.05).name('Bloom Strength').onChange((v) => viewer.setBloom({ strength: v }))
 fView.add(settings, 'bloomThreshold', 0, 2, 0.01).name('Bloom Threshold').onChange((v) => viewer.setBloom({ threshold: v }))
