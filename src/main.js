@@ -120,9 +120,15 @@ const settings = {
   bakeAONow: async () => {
     if (bakeInProgress) return
     bakeInProgress = true
+    const box = document.getElementById('bake-progress')
+    const label = document.getElementById('bake-label')
+    const pct = document.getElementById('bake-pct')
+    const bar = document.getElementById('bake-bar')
+    box.classList.add('active')
     try {
-      for (const part of Object.values(parts)) {
-        if (!part.baseGeometry) continue
+      const targets = Object.values(parts).filter((p) => p.baseGeometry)
+      for (let i = 0; i < targets.length; i++) {
+        const part = targets[i]
         // bake on a subdivided display copy; keep the clean export geometry
         if (!part.exportGeometry) {
           part.exportGeometry = part.mesh.geometry
@@ -130,7 +136,12 @@ const settings = {
         }
         await bakeAO(part.mesh.geometry, {
           samples: settings.bakeSamples,
-          onProgress: (p) => setStatus(`Baking AO (${part.name}): ${Math.round(p * 100)}%`),
+          onProgress: (p) => {
+            const total = (i + p) / targets.length
+            label.textContent = `Baking AO — ${part.name} (${settings.bakeSamples} samples)`
+            pct.textContent = `${Math.round(total * 100)}%`
+            bar.style.width = `${Math.round(total * 100)}%`
+          },
         })
       }
       viewer.applyRenderMode()
@@ -138,8 +149,14 @@ const settings = {
       viewer.setVertexColors(true)
       gui.controllersRecursive().forEach((c) => c.updateDisplay())
       setStatus('Baked AO applied (vertex colors)')
+    } catch (err) {
+      console.error(err)
+      viewer.setVertexColors(false)
+      setStatus(`AO bake failed: ${err.message}`)
     } finally {
       bakeInProgress = false
+      box.classList.remove('active')
+      bar.style.width = '0%'
     }
   },
   bloom: false,
@@ -258,6 +275,7 @@ fBake.add(settings, 'bakeSamples', 8, 128, 8).name('Samples')
 fBake.add(settings, 'bakeAONow').name('⚡ Bake AO Now')
 fBake.add(settings, 'bakedAO').name('Use Baked AO').onChange((v) => {
   if (!v) {
+    viewer.setVertexColors(false)
     for (const part of Object.values(parts)) {
       clearBakedAO(part.mesh.geometry)
       if (part.exportGeometry) {
@@ -268,10 +286,18 @@ fBake.add(settings, 'bakedAO').name('Use Baked AO').onChange((v) => {
       }
     }
     viewer.applyRenderMode()
+    return
   }
-  viewer.setVertexColors(v)
-  if (v && ![...Object.values(parts)].some((p) => p.mesh.geometry.getAttribute('color'))) {
-    settings.bakeAONow()
+  // Never enable vertex colors before every part actually has baked colors —
+  // a missing color attribute renders as black
+  const allBaked = Object.values(parts)
+    .every((p) => !p.baseGeometry || p.mesh.geometry.getAttribute('color'))
+  if (allBaked) {
+    viewer.setVertexColors(true)
+  } else {
+    settings.bakedAO = false
+    gui.controllersRecursive().forEach((c) => c.updateDisplay())
+    settings.bakeAONow() // sets bakedAO + vertex colors when done
   }
 })
 fBake.close()

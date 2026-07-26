@@ -121,6 +121,40 @@
         font-size: 11px;
         color: #888;
       }
+      #bake-progress {
+        position: fixed;
+        left: 50%;
+        bottom: 36px;
+        transform: translateX(-50%);
+        width: min(360px, 80vw);
+        background: #222226ee;
+        border: 1px solid #3a3a44;
+        border-radius: 8px;
+        padding: 10px 14px;
+        z-index: 15;
+        display: none;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+      }
+      #bake-progress.active { display: block; }
+      #bake-progress .label {
+        color: #ddd;
+        font-size: 12px;
+        margin-bottom: 6px;
+        display: flex;
+        justify-content: space-between;
+      }
+      #bake-progress .bar {
+        height: 6px;
+        background: #333;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      #bake-progress .bar > div {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #ff9d2f, #ffd54a);
+        transition: width 0.1s;
+      }
     </style>
   </head>
   <body>
@@ -128,6 +162,10 @@
     <div id="drop-hint">Drop STL / HDR file to load</div>
     <div id="status"></div>
     <div id="fps"></div>
+    <div id="bake-progress">
+      <div class="label"><span id="bake-label">Baking AO…</span><span id="bake-pct">0%</span></div>
+      <div class="bar"><div id="bake-bar"></div></div>
+    </div>
     <div id="loading">
       <div class="dialog">
         <h1>Famicom Cartridge Tool</h1>
