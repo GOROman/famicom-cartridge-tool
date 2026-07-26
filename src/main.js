@@ -10,6 +10,7 @@ import { StickerManager } from './sticker.js'
 import { initManifold } from './csg.js'
 import { bakeAOLightmap } from './aobake.js'
 import { MeasureTool } from './measure.js'
+import { PCBManager } from './pcb.js'
 
 const BASE = import.meta.env.BASE_URL
 
@@ -130,6 +131,7 @@ let bakedTexture = null
 
 const featureFolderById = new Map()
 const stickerMgr = new StickerManager()
+const pcbMgr = new PCBManager(parts.Bottom)
 const measureTool = new MeasureTool(viewer,
   () => Object.values(parts).map((p) => p.mesh).filter((m) => m.visible))
 const gizmoMgr = new RecessGizmoManager(viewer, {
@@ -204,6 +206,40 @@ const settings = {
   measureMode: false,
   clearMeasures: () => measureTool.clear(),
   showInside: false,
+  importPCB: () => pickFile('.step,.stp', async (buf, file) => {
+    try {
+      const size = await pcbMgr.loadStep(buf, file.name, setStatus)
+      settings.pcbVisible = true
+      gui.controllersRecursive().forEach((c) => c.updateDisplay())
+      setStatus(`PCB loaded: ${file.name} (${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} mm)`)
+    } catch (err) {
+      console.error(err)
+      setStatus(`STEP import failed: ${err.message}`)
+    }
+  }),
+  pcbVisible: true,
+  runDRC: () => {
+    const panel = document.getElementById('drc-panel')
+    const title = document.getElementById('drc-title')
+    const list = document.getElementById('drc-list')
+    try {
+      const topH = parts.Top.bounds.max.z, botH = parts.Bottom.bounds.max.z
+      const issues = pcbMgr.runDRC(parts.Top, botH + topH - SEAT_OVERLAP)
+      panel.classList.add('active')
+      panel.classList.toggle('err', issues.length > 0)
+      panel.classList.toggle('ok', issues.length === 0)
+      title.textContent = issues.length ? `DRC: ${issues.length} error(s)` : 'DRC: OK — no interference'
+      list.innerHTML = issues.length
+        ? issues.map((i) => `<li>${i}</li>`).join('')
+        : '<li>Board fits: no overlap with either shell in the closed case.</li>'
+      setStatus(issues.length ? `DRC failed: ${issues.length} issue(s)` : 'DRC passed')
+    } catch (err) {
+      panel.classList.add('active', 'err')
+      title.textContent = 'DRC error'
+      list.innerHTML = `<li>${err.message}</li>`
+    }
+  },
+  removePCB: () => { pcbMgr.clear(); setStatus('PCB removed') },
   showTop: true,
   showBottom: true,
   assemble: false,
@@ -394,6 +430,19 @@ fFeat.add(settings, 'addFeature').name('+ Add Feature')
 
 const featureFolders = { Top: fFeat.addFolder('Top Features'), Bottom: fFeat.addFolder('Bottom Features') }
 
+const fPCB = gui.addFolder('PCB Fit Test (STEP)')
+fPCB.add(settings, 'importPCB').name('Import PCB .STEP…')
+fPCB.add(settings, 'pcbVisible').name('Show PCB').onChange((v) => { pcbMgr.group.visible = v })
+fPCB.add(pcbMgr.params, 'x', -50, 50, 0.1).name('X').onChange(() => pcbMgr.applyParams())
+fPCB.add(pcbMgr.params, 'y', -35, 35, 0.1).name('Y').onChange(() => pcbMgr.applyParams())
+fPCB.add(pcbMgr.params, 'z', 0, 20, 0.1).name('Z (seat height)').onChange(() => pcbMgr.applyParams())
+fPCB.add(pcbMgr.params, 'rotZ', -180, 180, 1).name('Rotation°').onChange(() => pcbMgr.applyParams())
+fPCB.add(pcbMgr.params, 'flip').name('Flip').onChange(() => pcbMgr.applyParams())
+fPCB.add(pcbMgr.params, 'opacity', 0.1, 1, 0.05).name('Opacity').onChange(() => pcbMgr.applyParams())
+fPCB.add(settings, 'runDRC').name('⚠ Run DRC')
+fPCB.add(settings, 'removePCB').name('✕ Remove PCB')
+fPCB.close()
+
 const fMeasure = gui.addFolder('Measure')
 fMeasure.add(settings, 'measureMode').name('Measure Mode (click 2 pts)').onChange((v) => measureTool.setEnabled(v))
 fMeasure.add(settings, 'clearMeasures').name('Clear Measurements')
@@ -486,6 +535,10 @@ function addFeatureFolder(part, f) {
       num('radius', 'Radius (mm)', 0.3, 2.8)
       num('height', 'Height (mm)', 0.5, 10)
       break
+    case 'Top Pin':
+      num('radius', 'Radius (mm)', 0.5, 1.95)
+      num('height', 'Height (mm)', 1, 14)
+      break
     case 'Sticker':
       folder.add({ load: () => pickFile('.png,.jpg,.jpeg,.webp', null, async (file) => {
         await stickerMgr.setImage(part, f, URL.createObjectURL(file), file.name)
@@ -531,6 +584,14 @@ window.addEventListener('drop', async (e) => {
     applyDisplayTransform(part)
     rebuild(part, true)
     setStatus(`Imported ${file.name} into ${part.name}`)
+  } else if (/\.(step|stp)$/i.test(file.name)) {
+    try {
+      const size = await pcbMgr.loadStep(await file.arrayBuffer(), file.name, setStatus)
+      setStatus(`PCB loaded: ${file.name} (${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} mm)`)
+    } catch (err) {
+      console.error(err)
+      setStatus(`STEP import failed: ${err.message}`)
+    }
   } else if (/\.(png|jpe?g|webp)$/i.test(file.name)) {
     const part = parts[settings.activePart]
     let f = part.features.findLast((x) => x.type === 'Sticker')
@@ -610,6 +671,11 @@ function syncDendyFillFeatures(templateName) {
     { name: 'Side Pins', _dendyFill: true })
   parts.Bottom.features.push(pins)
   addFeatureFolder(parts.Bottom, pins)
+  // mating pin on the top shell that inserts into the Center Boss hole
+  const topPin = Object.assign(createFeature('Top Pin', parts.Top.bounds),
+    { name: 'Top Pin (into Boss)', _dendyFill: true })
+  parts.Top.features.push(topPin)
+  addFeatureFolder(parts.Top, topPin)
 }
 
 async function init() {

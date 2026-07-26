@@ -18,6 +18,7 @@
   "dependencies": {
     "lil-gui": "^0.21.0",
     "manifold-3d": "^3.5.1",
+    "occt-import-js": "^0.0.23",
     "three": "^0.185.1",
     "three-mesh-bvh": "^0.9.13"
   },

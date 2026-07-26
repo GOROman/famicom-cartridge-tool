@@ -67,6 +67,11 @@ export function createFeature(type, partBounds) {
     case 'Side Pins':
       // Dendy bottom shell: locate pins at (±37.9,-2.6), r1.08, h4.7
       return { ...base, radius: 1.08, height: 4.7 }
+    case 'Top Pin':
+      // Dendy top shell: mating pin at (0,-10.1) that inserts into the
+      // bottom shell's Center Boss hole (r2.0) when the case is closed.
+      // Floor-to-boss-top gap is 8 mm, so height >8 engages the hole.
+      return { ...base, radius: 1.8, height: 10 }
     case 'Sticker':
       // Display-only textured label (PNG/JPG); not part of the CSG solid
       return {
@@ -94,6 +99,7 @@ export function buildFeatureManifolds(f, partBounds, font) {
     case 'Text': return buildText(f, partBounds, font)
     case 'Center Boss': return buildCenterBoss(f)
     case 'Side Pins': return buildSidePins(f)
+    case 'Top Pin': return buildTopPin(f)
     case 'Sticker': return [] // rendered as a textured overlay, not CSG
   }
   return []
@@ -115,6 +121,16 @@ function buildCenterBoss(f) {
     { manifold: clear, subtract: true },
     { manifold: tube, subtract: false },
   ]
+}
+
+// Mating pin on the top shell aligned with the bottom shell's Center Boss
+// hole (assembly maps top (0,-10.1) onto bottom (0,-10.1)). Embedded 1 mm
+// into the shell floor so the union is always solid.
+function buildTopPin(f) {
+  const { Manifold } = manifoldAPI()
+  const m = Manifold.cylinder(f.height + 1, f.radius, f.radius, 32)
+    .translate([BOSS.x, BOSS.y, 1])
+  return [{ manifold: m, subtract: false }]
 }
 
 // Rebuild the two locate pins at (±37.9, -2.6) with a chosen radius/height.

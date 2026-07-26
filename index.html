@@ -149,6 +149,33 @@
         border-radius: 3px;
         overflow: hidden;
       }
+      #drc-panel {
+        position: fixed;
+        right: 12px;
+        bottom: 36px;
+        width: min(340px, 80vw);
+        background: #222226f2;
+        border: 1px solid #3a3a44;
+        border-radius: 8px;
+        padding: 12px 14px;
+        z-index: 15;
+        display: none;
+        color: #ddd;
+        font-size: 12px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+      }
+      #drc-panel.active { display: block; }
+      #drc-panel h2 { font-size: 13px; margin: 0 0 8px; }
+      #drc-panel.ok h2 { color: #6f6; }
+      #drc-panel.err h2 { color: #f66; }
+      #drc-panel ul { margin: 0; padding-left: 18px; line-height: 1.6; }
+      #drc-panel .close {
+        position: absolute;
+        top: 6px;
+        right: 10px;
+        cursor: pointer;
+        color: #888;
+      }
       #bake-progress .bar > div {
         height: 100%;
         width: 0%;
@@ -162,6 +189,11 @@
     <div id="drop-hint">Drop STL / HDR file to load</div>
     <div id="status"></div>
     <div id="fps"></div>
+    <div id="drc-panel">
+      <span class="close" onclick="this.parentElement.classList.remove('active')">✕</span>
+      <h2 id="drc-title">DRC</h2>
+      <ul id="drc-list"></ul>
+    </div>
     <div id="bake-progress">
       <div class="label"><span id="bake-label">Baking AO…</span><span id="bake-pct">0%</span></div>
       <div class="bar"><div id="bake-bar"></div></div>

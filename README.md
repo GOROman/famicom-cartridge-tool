@@ -19,6 +19,7 @@ boolean cuts, engraved/embossed text) and export print-ready binary STL files.
   - **Sticker** — import a PNG/JPG (file picker or drag & drop) and place it as a textured label with size/position/rotation/opacity (display-only preview, not exported)
   - **Center Boss / Side Pins** (Dendy template) — adjust the bottom shell's screw-boss height and locate-pin radius/height with sliders
 - **Measure tool** — click two points to draw a drafting-style dimension line with arrowheads and the distance in mm
+- **PCB fit test** — import a board `.STEP` (OpenCASCADE WASM, lazy-loaded), position it inside the bottom shell, and run **DRC**: reports CSG intersection volumes against both shells in the closed-case position (with red overlap highlights) plus interior-height violations
 - **Rendering** — Wireframe / Simple shaded / PBR with HDR environment
   - 4 bundled HDRI presets (Studio, Sunrise, Sunset, Night — CC0 from [Poly Haven](https://polyhaven.com/)) plus a procedural room default, or drop in your own `.hdr`
 - **Shadows** — soft shadow mapping with a toggle
