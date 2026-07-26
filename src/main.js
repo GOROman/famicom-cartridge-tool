@@ -119,6 +119,7 @@ const settings = {
   bakeSamples: 16,
   bakeResolution: 1024,
   bakedAO: false,
+  bakedAOIntensity: 1,
   bakeAONow: async () => {
     if (bakeInProgress) return
     bakeInProgress = true
@@ -142,6 +143,7 @@ const settings = {
       bakedTexture = tex
       settings.bakedAO = true
       viewer.setAOMap(tex)
+      viewer.setAOMapIntensity(settings.bakedAOIntensity)
       gui.controllersRecursive().forEach((c) => c.updateDisplay())
       setStatus(`Baked AO lightmap applied (${settings.bakeResolution}px, ${(tex.userData.bakeMs / 1000).toFixed(1)}s)`)
     } catch (err) {
@@ -272,6 +274,7 @@ fView.add(settings, 'antialias').name('Anti-Aliasing (SMAA)').onChange((v) => vi
 const fBake = fView.addFolder('Baked AO (Lightmap)')
 fBake.add(settings, 'bakeResolution', [512, 1024, 2048]).name('Resolution (px)')
 fBake.add(settings, 'bakeSamples', 8, 64, 8).name('Samples')
+fBake.add(settings, 'bakedAOIntensity', 0, 2, 0.05).name('Intensity').onChange((v) => viewer.setAOMapIntensity(v))
 fBake.add(settings, 'bakeAONow').name('⚡ Bake AO Now')
 fBake.add(settings, 'bakedAO').name('Use Baked AO').onChange((v) => {
   if (!v) {
@@ -280,6 +283,7 @@ fBake.add(settings, 'bakedAO').name('Use Baked AO').onChange((v) => {
   }
   if (bakedTexture) {
     viewer.setAOMap(bakedTexture)
+    viewer.setAOMapIntensity(settings.bakedAOIntensity)
   } else {
     // no lightmap yet — bake first, aoMap switches on when it completes
     settings.bakedAO = false

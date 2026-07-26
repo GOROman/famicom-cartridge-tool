@@ -180,8 +180,13 @@ export class Viewer {
   setAOMap(texture) {
     for (const mode of ['Simple', 'PBR (HDR)']) {
       this.materials[mode].aoMap = texture
-      this.materials[mode].aoMapIntensity = 1
       this.materials[mode].needsUpdate = true
+    }
+  }
+
+  setAOMapIntensity(value) {
+    for (const mode of ['Simple', 'PBR (HDR)']) {
+      this.materials[mode].aoMapIntensity = value
     }
   }
 
