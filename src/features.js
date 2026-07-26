@@ -60,6 +60,13 @@ export function createFeature(type, partBounds) {
         rotZ: 0,
         face: 'Bottom',
       }
+    case 'Center Boss':
+      // Dendy bottom shell: screw boss at (0,-10.1), outer r3.5 / hole r2.0,
+      // floor z=2, original height 5 mm
+      return { ...base, height: 5 }
+    case 'Side Pins':
+      // Dendy bottom shell: locate pins at (±37.9,-2.6), r1.08, h4.7
+      return { ...base, radius: 1.08, height: 4.7 }
     case 'Sticker':
       // Display-only textured label (PNG/JPG); not part of the CSG solid
       return {
@@ -85,9 +92,49 @@ export function buildFeatureManifolds(f, partBounds, font) {
     case 'Box': return [buildBox(f)]
     case 'Cylinder': return [buildCylinder(f)]
     case 'Text': return buildText(f, partBounds, font)
+    case 'Center Boss': return buildCenterBoss(f)
+    case 'Side Pins': return buildSidePins(f)
     case 'Sticker': return [] // rendered as a textured overlay, not CSG
   }
   return []
+}
+
+// Rebuild the Dendy bottom shell's central screw boss at a chosen height:
+// remove the original boss above the floor, then re-extrude the tube
+// (outer r3.5, screw hole r2.0) to the requested height.
+const BOSS = { x: 0, y: -10.1, floorZ: 2.0, outerR: 3.5, innerR: 2.0 }
+function buildCenterBoss(f) {
+  const { Manifold } = manifoldAPI()
+  const clear = Manifold.cylinder(14, BOSS.outerR + 0.8, BOSS.outerR + 0.8, 48)
+    .translate([BOSS.x, BOSS.y, BOSS.floorZ + 0.05])
+  const tube = Manifold.cylinder(f.height, BOSS.outerR, BOSS.outerR, 48)
+    .subtract(Manifold.cylinder(f.height + 2, BOSS.innerR, BOSS.innerR, 48)
+      .translate([0, 0, -1]))
+    .translate([BOSS.x, BOSS.y, BOSS.floorZ])
+  return [
+    { manifold: clear, subtract: true },
+    { manifold: tube, subtract: false },
+  ]
+}
+
+// Rebuild the two locate pins at (±37.9, -2.6) with a chosen radius/height.
+const PINS = { xs: [-37.9, 37.9], y: -2.6, floorZ: 2.0 }
+function buildSidePins(f) {
+  const { Manifold } = manifoldAPI()
+  const out = []
+  for (const px of PINS.xs) {
+    out.push({
+      manifold: Manifold.cylinder(12, 3, 3, 32)
+        .translate([px, PINS.y, PINS.floorZ + 0.05]),
+      subtract: true,
+    })
+    out.push({
+      manifold: Manifold.cylinder(f.height, f.radius, f.radius, 32)
+        .translate([px, PINS.y, PINS.floorZ]),
+      subtract: false,
+    })
+  }
+  return out
 }
 
 const EPS = 0.05 // overshoot so cuts fully pierce surfaces

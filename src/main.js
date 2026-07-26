@@ -9,6 +9,7 @@ import { RecessGizmoManager } from './gizmo.js'
 import { StickerManager } from './sticker.js'
 import { initManifold } from './csg.js'
 import { bakeAOLightmap } from './aobake.js'
+import { MeasureTool } from './measure.js'
 
 const BASE = import.meta.env.BASE_URL
 
@@ -122,6 +123,8 @@ let bakedTexture = null
 
 const featureFolderById = new Map()
 const stickerMgr = new StickerManager()
+const measureTool = new MeasureTool(viewer,
+  () => Object.values(parts).map((p) => p.mesh).filter((m) => m.visible))
 const gizmoMgr = new RecessGizmoManager(viewer, {
   onChange: (part, f) => {
     featureFolderById.get(f.id)?.controllersRecursive().forEach((c) => c.updateDisplay())
@@ -191,6 +194,8 @@ const settings = {
   hdriPreset: 'Room (Default)',
   activePart: 'Top',
   template: 'Dendy (5rw)',
+  measureMode: false,
+  clearMeasures: () => measureTool.clear(),
   showTop: true,
   showBottom: true,
   assemble: false,
@@ -375,6 +380,10 @@ fFeat.add(settings, 'addFeature').name('+ Add Feature')
 
 const featureFolders = { Top: fFeat.addFolder('Top Features'), Bottom: fFeat.addFolder('Bottom Features') }
 
+const fMeasure = gui.addFolder('Measure')
+fMeasure.add(settings, 'measureMode').name('Measure Mode (click 2 pts)').onChange((v) => measureTool.setEnabled(v))
+fMeasure.add(settings, 'clearMeasures').name('Clear Measurements')
+
 const fExport = gui.addFolder('Export')
 fExport.add(settings, 'exportTop').name('Export Top STL')
 fExport.add(settings, 'exportBottom').name('Export Bottom STL')
@@ -455,6 +464,13 @@ function addFeatureFolder(part, f) {
       num('x', 'X', -50, 50)
       num('y', 'Y', -30, 30)
       num('rotZ', 'Rotation°', -180, 180, 1)
+      break
+    case 'Center Boss':
+      num('height', 'Height (mm)', 0.5, 12)
+      break
+    case 'Side Pins':
+      num('radius', 'Radius (mm)', 0.3, 2.8)
+      num('height', 'Height (mm)', 0.5, 10)
       break
     case 'Sticker':
       folder.add({ load: () => pickFile('.png,.jpg,.jpeg,.webp', null, async (file) => {
@@ -571,6 +587,15 @@ function syncDendyFillFeatures(templateName) {
     part.features.push(fill)
     addFeatureFolder(part, fill)
   }
+  // adjustable screw boss and locate pins on the bottom shell
+  const boss = Object.assign(createFeature('Center Boss', parts.Bottom.bounds),
+    { name: 'Center Boss', _dendyFill: true })
+  parts.Bottom.features.push(boss)
+  addFeatureFolder(parts.Bottom, boss)
+  const pins = Object.assign(createFeature('Side Pins', parts.Bottom.bounds),
+    { name: 'Side Pins', _dendyFill: true })
+  parts.Bottom.features.push(pins)
+  addFeatureFolder(parts.Bottom, pins)
 }
 
 async function init() {
