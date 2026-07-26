@@ -302,10 +302,10 @@ fMat.add(settings, 'stickerClearcoat', 0, 1, 0.01).name('Sticker Clearcoat').onC
 fMat.close()
 const HDRI_PRESETS = {
   'Room (Default)': null,
-  'Studio': 'studio_small_03_1k.hdr',
-  'Sunrise': 'spruit_sunrise_1k.hdr',
-  'Sunset': 'venice_sunset_1k.hdr',
-  'Night': 'moonless_golf_1k.hdr',
+  'Studio': 'studio_small_03_2k.hdr',
+  'Sunrise': 'spruit_sunrise_2k.hdr',
+  'Sunset': 'venice_sunset_2k.hdr',
+  'Night': 'moonless_golf_2k.hdr',
 }
 fView.add(settings, 'hdriPreset', Object.keys(HDRI_PRESETS)).name('HDRI Preset').onChange(async (v) => {
   const file = HDRI_PRESETS[v]
