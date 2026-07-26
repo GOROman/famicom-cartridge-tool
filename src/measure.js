@@ -5,17 +5,17 @@ import * as THREE from 'three'
 
 const COLOR = 0xffdd33
 
-function makeLabel(text) {
+export function makeLabel(text, color = '#ffdd33', scale = 1) {
   const canvas = document.createElement('canvas')
   canvas.width = 256
   canvas.height = 64
   const g = canvas.getContext('2d')
   g.fillStyle = 'rgba(20,20,24,0.85)'
   g.fillRect(0, 0, 256, 64)
-  g.strokeStyle = '#ffdd33'
+  g.strokeStyle = color
   g.lineWidth = 3
   g.strokeRect(2, 2, 252, 60)
-  g.fillStyle = '#ffdd33'
+  g.fillStyle = color
   g.font = 'bold 30px monospace'
   g.textAlign = 'center'
   g.textBaseline = 'middle'
@@ -25,7 +25,7 @@ function makeLabel(text) {
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
     map: tex, depthTest: false, transparent: true,
   }))
-  sprite.scale.set(24, 6, 1)
+  sprite.scale.set(24 * scale, 6 * scale, 1)
   sprite.renderOrder = 1002
   return sprite
 }

@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import GUI from 'lil-gui'
 import { FontLoader } from 'three/addons/loaders/FontLoader.js'
-import { Viewer, RENDER_MODES } from './viewer.js'
+import { Viewer } from './viewer.js'
 import { Part } from './model.js'
 import { FEATURE_TYPES, createFeature } from './features.js'
 import { exportSTL } from './exporter.js'
@@ -11,6 +11,7 @@ import { initManifold } from './csg.js'
 import { bakeAOLightmap } from './aobake.js'
 import { MeasureTool } from './measure.js'
 import { PCBManager } from './pcb.js'
+import { DimensionsOverlay } from './dimensions.js'
 
 const BASE = import.meta.env.BASE_URL
 
@@ -132,6 +133,24 @@ let bakedTexture = null
 const featureFolderById = new Map()
 const stickerMgr = new StickerManager()
 const pcbMgr = new PCBManager(parts.Bottom)
+const dimensions = new DimensionsOverlay(parts)
+
+// ---------- Render-mode icon toolbar ----------
+const MODE_BUTTONS = {
+  'Wireframe': document.getElementById('mode-wire'),
+  'Simple': document.getElementById('mode-simple'),
+  'PBR (HDR)': document.getElementById('mode-pbr'),
+}
+function setRenderMode(mode) {
+  viewer.setRenderMode(mode)
+  for (const [m, btn] of Object.entries(MODE_BUTTONS)) {
+    btn.classList.toggle('active', m === mode)
+  }
+}
+for (const [mode, btn] of Object.entries(MODE_BUTTONS)) {
+  btn.addEventListener('click', () => setRenderMode(mode))
+}
+setRenderMode(viewer.renderMode)
 const measureTool = new MeasureTool(viewer,
   () => Object.values(parts).map((p) => p.mesh).filter((m) => m.visible))
 const gizmoMgr = new RecessGizmoManager(viewer, {
@@ -204,6 +223,7 @@ const settings = {
   activePart: 'Top',
   template: 'Dendy (5rw)',
   measureMode: false,
+  showDimensions: false,
   clearMeasures: () => measureTool.clear(),
   showInside: false,
   importPCB: () => pickFile('.step,.stp', async (buf, file) => {
@@ -342,7 +362,7 @@ function doExport(names) {
 const gui = new GUI({ title: 'Famicom Cartridge Tool', width: 320 })
 
 const fView = gui.addFolder('Rendering')
-fView.add(settings, 'renderMode', RENDER_MODES).name('Mode').onChange((v) => viewer.setRenderMode(v))
+// render mode is switched via the icon toolbar at the top of the screen
 fView.add(settings, 'shadows').name('Shadows').onChange((v) => viewer.setShadows(v))
 fView.add(settings, 'ao').name('Ambient Occlusion').onChange((v) => viewer.setAO(v))
 fView.add(settings, 'aoRadius', 0.5, 20, 0.5).name('AO Radius (mm)').onChange((v) => viewer.setAOParams({ radius: v }))
@@ -445,6 +465,7 @@ fPCB.close()
 
 const fMeasure = gui.addFolder('Measure')
 fMeasure.add(settings, 'measureMode').name('Measure Mode (click 2 pts)').onChange((v) => measureTool.setEnabled(v))
+fMeasure.add(settings, 'showDimensions').name('Show Dimensions').onChange((v) => dimensions.setVisible(v))
 fMeasure.add(settings, 'clearMeasures').name('Clear Measurements')
 
 const fExport = gui.addFolder('Export')
@@ -634,6 +655,7 @@ async function loadTemplate(name) {
   applyDisplayTransform(parts.Top)
   applyDisplayTransform(parts.Bottom)
   document.getElementById('credit').innerHTML = t.creditHTML
+  if (settings.showDimensions) dimensions.update()
   setStatus(`Template: ${name} — ${t.credit}`)
 }
 

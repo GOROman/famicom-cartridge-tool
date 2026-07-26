@@ -65,6 +65,38 @@
       }
       #links a:hover { color: #fff; }
       #links svg { width: 20px; height: 20px; fill: currentColor; }
+      #mode-toolbar {
+        position: fixed;
+        left: 50%;
+        top: 10px;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 6px;
+        z-index: 6;
+        background: rgba(30,30,36,0.8);
+        border: 1px solid #3a3a44;
+        border-radius: 10px;
+        padding: 5px;
+      }
+      #mode-toolbar button {
+        width: 40px;
+        height: 40px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        color: #aaa;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #mode-toolbar button:hover { color: #fff; background: #33333d; }
+      #mode-toolbar button.active {
+        color: #6cf;
+        background: #2a3a4a;
+        border-color: #4a9eff;
+      }
+      #mode-toolbar svg { width: 24px; height: 24px; }
       #fps {
         position: fixed;
         left: 12px;
@@ -188,6 +220,25 @@
     <div id="app"></div>
     <div id="drop-hint">Drop STL / HDR file to load</div>
     <div id="status"></div>
+    <div id="mode-toolbar">
+      <button id="mode-wire" title="Wireframe">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 17 L12 4 L21 17 Z"/><path d="M7.5 17 L12 10.5 L16.5 17"/><path d="M9.7 7.3 L12 10.5 L14.3 7.3"/>
+        </svg>
+      </button>
+      <button id="mode-simple" title="Simple (flat shading)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 3 L20 7.5 V16.5 L12 21 L4 16.5 V7.5 Z"/><path d="M12 3 V12 M12 12 L20 7.5 M12 12 L4 7.5" opacity="0.6"/>
+        </svg>
+      </button>
+      <button id="mode-pbr" title="PBR (HDR environment)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="8.5"/>
+          <ellipse cx="12" cy="12" rx="8.5" ry="3.4" opacity="0.5"/>
+          <circle cx="9" cy="9" r="2" fill="currentColor" stroke="none" opacity="0.8"/>
+        </svg>
+      </button>
+    </div>
     <div id="fps"></div>
     <div id="drc-panel">
       <span class="close" onclick="this.parentElement.classList.remove('active')">✕</span>
