@@ -303,7 +303,7 @@ function rebuild(part, immediate = false) {
     setStatus(`${part.name} rebuilt in ${part.lastBuildMs.toFixed(0)} ms`)
   }
   if (immediate) run()
-  else rebuildTimer = setTimeout(run, 200)
+  else rebuildTimer = setTimeout(run, 50)
 }
 
 function rebuildAll() {

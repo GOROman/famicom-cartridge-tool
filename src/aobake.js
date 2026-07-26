@@ -1,5 +1,4 @@
 import * as THREE from 'three'
-import { MeshBVH } from 'three-mesh-bvh'
 
 // Ray-traced ambient-occlusion LIGHTMAP bake.
 // Every triangle of every part is unwrapped into its own patch in a single
@@ -109,92 +108,52 @@ export async function bakeAOLightmap(geometries, {
   onProgress = () => {},
 } = {}) {
   const { patches, scale } = packAtlas(geometries, resolution)
-  const bvhs = geometries.map((g) => new MeshBVH(g))
 
   const data = new Uint8Array(resolution * resolution * 4)
   const filled = new Uint8Array(resolution * resolution)
-
-  const origin = new THREE.Vector3()
-  const normal = new THREE.Vector3()
-  const tangent = new THREE.Vector3()
-  const bitangent = new THREE.Vector3()
-  const dir = new THREE.Vector3()
-  const ray = new THREE.Ray()
-  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3()
-
-  let texelBudget = 0
   const t0 = performance.now()
-  for (let pi = 0; pi < patches.length; pi++) {
-    const p = patches[pi]
-    const pos = geometries[p.geo].attributes.position.array
-    const i = p.tri
-    a.set(pos[i], pos[i + 1], pos[i + 2])
-    b.set(pos[i + 3], pos[i + 4], pos[i + 5])
-    c.set(pos[i + 6], pos[i + 7], pos[i + 8])
-    faceNormal(pos, i, normal).normalize()
-    tangent.set(1, 0, 0)
-    if (Math.abs(normal.x) > 0.9) tangent.set(0, 1, 0)
-    tangent.cross(normal).normalize()
-    bitangent.crossVectors(normal, tangent)
-    const bvh = bvhs[p.geo]
 
-    // inverse barycentric setup in patch space
-    const x0 = p.ax, y0 = p.ay, x1 = p.bx, y1 = p.by, x2 = p.cx, y2 = p.cy
-    const det = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2) || 1e-9
-
-    for (let ty = 0; ty <= p.ph; ty++) {
-      for (let tx = 0; tx <= p.pw; tx++) {
-        const lx = (tx + 0.5) / scale
-        const ly = (ty + 0.5) / scale
-        let w0 = ((y1 - y2) * (lx - x2) + (x2 - x1) * (ly - y2)) / det
-        let w1 = ((y2 - y0) * (lx - x2) + (x0 - x2) * (ly - y2)) / det
-        let w2 = 1 - w0 - w1
-        // clamp slightly-outside texels to the triangle edge (gutter ring)
-        if (w0 < -0.25 || w1 < -0.25 || w2 < -0.25) continue
-        w0 = Math.max(0, w0); w1 = Math.max(0, w1); w2 = Math.max(0, w2)
-        const s = w0 + w1 + w2
-        w0 /= s; w1 /= s; w2 /= s
-
-        origin.set(
-          a.x * w0 + b.x * w1 + c.x * w2,
-          a.y * w0 + b.y * w1 + c.y * w2,
-          a.z * w0 + b.z * w1 + c.z * w2)
-        origin.addScaledVector(normal, 0.05)
-
-        let occlusion = 0
-        const rot = ((tx * 7 + ty * 13) % 16) / 16 // decorrelate sample pattern
-        for (let sIdx = 0; sIdx < samples; sIdx++) {
-          const u = (sIdx + 0.5) / samples
-          const v = (sIdx * 0.618033988749895 + rot) % 1
-          const r = Math.sqrt(u)
-          const phi = 2 * Math.PI * v
-          dir.copy(tangent).multiplyScalar(r * Math.cos(phi))
-            .addScaledVector(bitangent, r * Math.sin(phi))
-            .addScaledVector(normal, Math.sqrt(Math.max(0, 1 - u)))
-          ray.origin.copy(origin)
-          ray.direction.copy(dir)
-          const hit = bvh.raycastFirst(ray, THREE.DoubleSide)
-          if (hit && hit.distance < maxDist) occlusion += 1 - hit.distance / maxDist
-        }
-        const ao = Math.max(0, 1 - occlusion / samples)
-        const val = Math.round(255 * (0.25 + 0.75 * ao))
-        const px = p.px + tx
-        const py = p.py + ty
-        if (px < 0 || py < 0 || px >= resolution || py >= resolution) continue
-        const o = (py * resolution + px) * 4
-        data[o] = data[o + 1] = data[o + 2] = val
-        data[o + 3] = 255
-        filled[py * resolution + px] = 1
-      }
-    }
-
-    texelBudget += (p.pw + 1) * (p.ph + 1)
-    if (texelBudget > 20000) {
-      texelBudget = 0
-      onProgress(pi / patches.length)
-      await new Promise((r) => setTimeout(r, 0))
-    }
+  // Fan patches out across parallel workers, balanced by texel count
+  const nWorkers = Math.max(1, Math.min(8, (navigator.hardwareConcurrency || 4) - 1))
+  const buckets = Array.from({ length: nWorkers }, () => ({ patches: [], texels: 0 }))
+  for (const p of [...patches].sort((x, y) =>
+    (y.pw + 1) * (y.ph + 1) - (x.pw + 1) * (x.ph + 1))) {
+    const bucket = buckets.reduce((m, b) => (b.texels < m.texels ? b : m))
+    bucket.patches.push(p)
+    bucket.texels += (p.pw + 1) * (p.ph + 1)
   }
+
+  const progressPer = new Array(nWorkers).fill(0)
+  await Promise.all(buckets.map((bucket, wi) => new Promise((resolve, reject) => {
+    if (!bucket.patches.length) return resolve()
+    const worker = new Worker(new URL('./aobake.worker.js', import.meta.url), { type: 'module' })
+    worker.onerror = (err) => { worker.terminate(); reject(new Error(err.message || 'AO worker failed')) }
+    worker.onmessage = (e) => {
+      if (e.data.type === 'progress') {
+        progressPer[wi] = e.data.done / e.data.total
+        onProgress(progressPer.reduce((s, x) => s + x, 0) / nWorkers)
+        return
+      }
+      const { indices, values } = e.data
+      for (let i = 0; i < indices.length; i++) {
+        const idx = indices[i]
+        const o = idx * 4
+        data[o] = data[o + 1] = data[o + 2] = values[i]
+        data[o + 3] = 255
+        filled[idx] = 1
+      }
+      progressPer[wi] = 1
+      onProgress(progressPer.reduce((s, x) => s + x, 0) / nWorkers)
+      worker.terminate()
+      resolve()
+    }
+    worker.postMessage({
+      positions: geometries.map((g) => new Float32Array(g.attributes.position.array)),
+      patches: bucket.patches.map(({ geo, tri, ax, ay, bx, by, cx, cy, pw, ph, px, py }) =>
+        ({ geo, tri, ax, ay, bx, by, cx, cy, pw, ph, px, py })),
+      scale, samples, maxDist, resolution,
+    })
+  })))
 
   // dilate: bleed patch borders into empty texels so bilinear taps stay clean
   for (let pass = 0; pass < 2; pass++) {
