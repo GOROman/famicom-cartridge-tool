@@ -48,8 +48,15 @@ const PART_GAP = 76
 parts.Top.mesh.position.y = PART_GAP / 2
 parts.Bottom.mesh.position.y = -PART_GAP / 2
 function applyDisplayTransform(part) {
-  part.mesh.rotation.x = Math.PI
-  part.mesh.position.z = part.bounds.max.z
+  if (settings?.showInside) {
+    // interior up (as printed / as modelled)
+    part.mesh.rotation.x = 0
+    part.mesh.position.z = 0
+  } else {
+    // outer face up (as seen on the finished cartridge)
+    part.mesh.rotation.x = Math.PI
+    part.mesh.position.z = part.bounds.max.z
+  }
   if (settings?.assemble) setAssemblyPose(1)
 }
 
@@ -196,6 +203,7 @@ const settings = {
   template: 'Dendy (5rw)',
   measureMode: false,
   clearMeasures: () => measureTool.clear(),
+  showInside: false,
   showTop: true,
   showBottom: true,
   assemble: false,
@@ -362,6 +370,12 @@ fParts.add(settings, 'template', Object.keys(TEMPLATES)).name('Template').onChan
   await loadTemplate(name)
   syncDendyFillFeatures(name)
   rebuildAll()
+})
+fParts.add(settings, 'showInside').name('Show Inside Up').onChange(() => {
+  if (settings.assemble) return // assembly pose takes over while closed
+  applyDisplayTransform(parts.Top)
+  applyDisplayTransform(parts.Bottom)
+  gizmoMgr.setAllVisible(!settings.assemble)
 })
 fParts.add(settings, 'showTop').name('Show Top').onChange((v) => { parts.Top.mesh.visible = v && !!parts.Top.baseGeometry })
 fParts.add(settings, 'assemble').name('Assembly Preview').onChange((v) => {
