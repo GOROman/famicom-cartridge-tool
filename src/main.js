@@ -55,9 +55,11 @@ function applyDisplayTransform(part) {
     part.mesh.rotation.x = 0
     part.mesh.position.z = 0
   } else {
-    // outer face up (as seen on the finished cartridge)
+    // outer face up (as seen on the finished cartridge); rest on the actual
+    // geometry height so features like the Top Pin don't sink into the floor
     part.mesh.rotation.x = Math.PI
-    part.mesh.position.z = part.bounds.max.z
+    part.mesh.geometry.computeBoundingBox()
+    part.mesh.position.z = part.mesh.geometry.boundingBox?.max.z ?? part.bounds.max.z
   }
   if (settings?.assemble) setAssemblyPose(1)
 }
@@ -76,26 +78,41 @@ function setAssemblyPose(mix) {
     const u = Math.min(1, Math.max(0, (mix - a) / (b - a)))
     return u * u * (3 - 2 * u)
   }
-  const f1 = ph(0, 0.34)    // flip + slide to centre
-  const f2 = ph(0.36, 0.58) // top drops and seats
-  const f3 = ph(0.64, 1)    // stand up
+  // Sequenced so rotating parts never sweep through each other or the floor:
+  // 1) bottom flips IN PLACE high in the air (its diagonal swings ~64 mm)
+  // 2) top lifts straight up out of the way
+  // 3) bottom slides underneath to the centre
+  // 4) top slides over at hover height, 5) drops and seats, 6) stand up
+  const f1 = ph(0, 0.24)     // bottom flips mid-air at its own spot
+  const f0 = ph(0.26, 0.36)  // top lifts vertically at its parked spot
+  const f1b = ph(0.38, 0.50) // bottom slides to centre, flat on its back
+  const f2 = ph(0.52, 0.66)  // top slides over at hover height
+  const f3 = ph(0.68, 0.80)  // top drops and seats
+  const f4 = ph(0.84, 1)     // stand up
 
-  const hoverZ = botH + topH + 16
+  // rest heights from the ACTUAL geometry (features like the Top Pin can
+  // extend past the base shell), mating height from the base shells
+  parts.Top.mesh.geometry.computeBoundingBox()
+  parts.Bottom.mesh.geometry.computeBoundingBox()
+  const topRestZ = parts.Top.mesh.geometry.boundingBox?.max.z ?? topH
+  const botRestZ = parts.Bottom.mesh.geometry.boundingBox?.max.z ?? botH
+  const hoverZ = botH + topRestZ + 24
   const seatZ = botH + topH - SEAT_OVERLAP
 
   parts.Bottom.mesh.quaternion.slerpQuaternions(Q_FLIPPED, Q_ASSEMBLED, f1)
-  const bp = new THREE.Vector3(0, -PART_GAP / 2 * (1 - f1), botH * (1 - f1))
+  const bp = new THREE.Vector3(0, -PART_GAP / 2 * (1 - f1b),
+    botRestZ * (1 - f1) + Math.sin(Math.PI * f1) * 60) // clear of the floor mid-flip
 
   parts.Top.mesh.quaternion.copy(Q_FLIPPED)
-  const tp = new THREE.Vector3(0, PART_GAP / 2 * (1 - f1),
-    topH + (hoverZ - topH) * f1 - (hoverZ - seatZ) * f2)
+  const tp = new THREE.Vector3(0, PART_GAP / 2 * (1 - f2),
+    topRestZ + (hoverZ - topRestZ) * f0 - (hoverZ - seatZ) * f3)
 
-  if (f3 > 0) {
+  if (f4 > 0) {
     const q = new THREE.Quaternion()
-      .setFromAxisAngle(new THREE.Vector3(1, 0, 0), -f3 * Math.PI / 2)
+      .setFromAxisAngle(new THREE.Vector3(1, 0, 0), -f4 * Math.PI / 2)
     const pivot = new THREE.Vector3(0, parts.Bottom.bounds.max.y, 0)
     // once upright, slide the cart so it stands centred on the origin
-    const originShift = -(pivot.y + seatZ / 2) * f3
+    const originShift = -(pivot.y + seatZ / 2) * f4
     for (const [mesh, p] of [[parts.Bottom.mesh, bp], [parts.Top.mesh, tp]]) {
       p.sub(pivot).applyQuaternion(q).add(pivot)
       p.y += originShift
@@ -113,7 +130,7 @@ function animateAssembly(toAssembled) {
   if (assemblyAnim) cancelAnimationFrame(assemblyAnim.raf)
   const from = assemblyAnim ? assemblyAnim.mix : (toAssembled ? 0 : 1)
   const start = performance.now()
-  const DURATION = 1300
+  const DURATION = 2000
   const step = (now) => {
     const t = Math.min(1, (now - start) / DURATION)
     const mix = toAssembled ? from + (1 - from) * t : from * (1 - t)
@@ -307,6 +324,7 @@ function rebuild(part, immediate = false) {
   clearTimeout(rebuildTimer)
   const run = () => {
     part.rebuild(font)
+    applyDisplayTransform(part)
     viewer.applyRenderMode()
     if (bakedTexture) {
       // geometry changed — atlas UVs and lightmap are stale
