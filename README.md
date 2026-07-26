@@ -34,16 +34,20 @@ npm run build   # production build into dist/
 
 Deployed automatically to GitHub Pages via GitHub Actions on push to `main`.
 
-## Base model — attribution
+## Base models — attribution
 
-The bundled base shells in `public/models/` are
-["Dendy (Famicom) cartridge"](https://www.thingiverse.com/thing:3357677) (Thingiverse #3357677)
-by [5rw](https://www.thingiverse.com/5rw), licensed under
-[Creative Commons — Attribution (CC BY)](https://creativecommons.org/licenses/by/4.0/).
+Three selectable base-model templates are bundled in `public/models/`, all licensed under
+[Creative Commons — Attribution (CC BY)](https://creativecommons.org/licenses/by/4.0/):
 
-Changes made: files renamed (`Dendy.stl` → `Dendy_bottom.stl`); the app applies
-user-controlled CSG modifications (label-area fill, recesses, grooves, text, etc.)
-at runtime. Units are millimetres, Z-up.
+| Template | Author | Source |
+|---|---|---|
+| Dendy (Famicom) cartridge | [5rw](https://www.thingiverse.com/5rw) | [Thingiverse #3357677](https://www.thingiverse.com/thing:3357677) |
+| Famicom (Dendy) Cartridge Case | [Hot_Pixel](https://www.thingiverse.com/Hot_Pixel) | [Thingiverse #5240914](https://www.thingiverse.com/thing:5240914) |
+| Shell for Famicom Everdrive N8, with USB port | [hadessuk](https://www.printables.com/@hadessuk) | [Printables #227423](https://www.printables.com/model/227423-shell-for-famicom-everdrive-n8-with-usb-port) |
+
+Changes made: files renamed; geometry is auto-normalised at load (thickness axis to Z,
+centred, outer face to −Z) and the app applies user-controlled CSG modifications
+(label-area fill, recesses, grooves, text, etc.) at runtime. Units are millimetres, Z-up.
 
 The bundled HDRI environments in `public/hdri/` are CC0 from [Poly Haven](https://polyhaven.com/).
 The tool's own source code is MIT licensed.

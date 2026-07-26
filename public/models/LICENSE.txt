@@ -1,9 +1,18 @@
-Dendy_top.stl and Dendy_bottom.stl (renamed from Dendy.stl):
-
-"Dendy (Famicom) cartridge" by 5rw
-https://www.thingiverse.com/thing:3357677
-Licensed under Creative Commons - Attribution (CC BY)
+All bundled base models are licensed under Creative Commons - Attribution (CC BY):
 https://creativecommons.org/licenses/by/4.0/
 
-Changes: Dendy.stl renamed to Dendy_bottom.stl. No geometry modified in the
-bundled files; the app applies user-controlled CSG edits at runtime.
+Dendy_top.stl, Dendy_bottom.stl (renamed from Dendy.stl):
+  "Dendy (Famicom) cartridge" by 5rw
+  https://www.thingiverse.com/thing:3357677
+
+hotpixel_top.stl, hotpixel_bottom.stl (renamed from top.STL / bottom.STL):
+  "Famicom (Dendy) Cartridge Case" by Hot_Pixel
+  https://www.thingiverse.com/thing:5240914
+
+n8_front.stl, n8_back.stl (renamed from n8-shell-usb-front.stl / n8-shell-usb-back.stl):
+  "Shell for Famicom Everdrive N8, with USB port" by hadessuk
+  https://www.printables.com/model/227423-shell-for-famicom-everdrive-n8-with-usb-port
+
+Changes: files renamed as noted; no geometry modified in the bundled files.
+The app normalises orientation at load time and applies user-controlled CSG
+edits at runtime.

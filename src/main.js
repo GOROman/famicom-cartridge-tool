@@ -11,6 +11,28 @@ import { initManifold } from './csg.js'
 import { bakeAOLightmap } from './aobake.js'
 
 const BASE = import.meta.env.BASE_URL
+
+// Base-model templates (all Creative Commons — Attribution)
+const TEMPLATES = {
+  'Dendy (5rw)': {
+    top: 'models/Dendy_top.stl',
+    bottom: 'models/Dendy_bottom.stl',
+    credit: '"Dendy (Famicom) cartridge" by 5rw / CC BY',
+    creditHTML: 'Base model: <a href="https://www.thingiverse.com/thing:3357677" target="_blank" rel="noopener">"Dendy (Famicom) cartridge"</a> by <a href="https://www.thingiverse.com/5rw" target="_blank" rel="noopener">5rw</a> / <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY</a>',
+  },
+  'Cartridge Case (Hot_Pixel)': {
+    top: 'models/hotpixel_top.stl',
+    bottom: 'models/hotpixel_bottom.stl',
+    credit: '"Famicom (Dendy) Cartridge Case" by Hot_Pixel / CC BY',
+    creditHTML: 'Base model: <a href="https://www.thingiverse.com/thing:5240914" target="_blank" rel="noopener">"Famicom (Dendy) Cartridge Case"</a> by <a href="https://www.thingiverse.com/Hot_Pixel" target="_blank" rel="noopener">Hot_Pixel</a> / <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY</a>',
+  },
+  'Everdrive N8 Shell (hadessuk)': {
+    top: 'models/n8_front.stl',
+    bottom: 'models/n8_back.stl',
+    credit: '"Shell for Famicom Everdrive N8" by hadessuk / CC BY',
+    creditHTML: 'Base model: <a href="https://www.printables.com/model/227423-shell-for-famicom-everdrive-n8-with-usb-port" target="_blank" rel="noopener">"Shell for Famicom Everdrive N8"</a> by <a href="https://www.printables.com/@hadessuk" target="_blank" rel="noopener">hadessuk</a> / <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY</a>',
+  },
+}
 const statusEl = document.getElementById('status')
 const viewer = new Viewer(document.getElementById('app'))
 
@@ -168,6 +190,7 @@ const settings = {
   envBackground: false,
   hdriPreset: 'Room (Default)',
   activePart: 'Top',
+  template: 'Dendy (5rw)',
   showTop: true,
   showBottom: true,
   assemble: false,
@@ -177,7 +200,7 @@ const settings = {
     await viewer.loadHDR(URL.createObjectURL(file))
     setStatus(`HDR environment loaded: ${file.name}`)
   }),
-  resetBase: async () => { await loadDefaults(); rebuildAll() },
+  resetBase: async () => { await loadTemplate(settings.template); rebuildAll() },
   exportTop: () => doExport(['Top']),
   exportBottom: () => doExport(['Bottom']),
   exportBoth: () => doExport(['Top', 'Bottom']),
@@ -237,6 +260,13 @@ function rebuild(part, immediate = false) {
 function rebuildAll() {
   for (const p of Object.values(parts)) p.rebuild(font)
   viewer.applyRenderMode()
+  if (bakedTexture) {
+    bakedTexture.dispose()
+    bakedTexture = null
+    viewer.setAOMap(null)
+    settings.bakedAO = false
+    gui?.controllersRecursive().forEach((c) => c.updateDisplay())
+  }
   setStatus('Rebuilt')
 }
 
@@ -322,6 +352,12 @@ fView.add(settings, 'envBackground').name('HDR Background').onChange((v) => view
 fView.add(settings, 'loadHDR').name('Load Custom HDR…')
 
 const fParts = gui.addFolder('Parts')
+fParts.add(settings, 'template', Object.keys(TEMPLATES)).name('Template').onChange(async (name) => {
+  setStatus(`Loading template: ${name}…`)
+  await loadTemplate(name)
+  syncDendyFillFeatures(name)
+  rebuildAll()
+})
 fParts.add(settings, 'showTop').name('Show Top').onChange((v) => { parts.Top.mesh.visible = v && !!parts.Top.baseGeometry })
 fParts.add(settings, 'assemble').name('Assembly Preview').onChange((v) => {
   animateAssembly(v)
@@ -496,15 +532,45 @@ const onFileProgress = (key, label) => (e) => {
   if (e.total) reportProgress(key, e.loaded / e.total, label)
 }
 
-async function loadDefaults() {
+async function loadTemplate(name) {
+  const t = TEMPLATES[name]
   await Promise.all([
-    parts.Top.loadURL(`${BASE}models/Dendy_top.stl`,
-      onFileProgress('top', 'Loading Dendy_top.stl…')).then(() => reportProgress('top', 1)),
-    parts.Bottom.loadURL(`${BASE}models/Dendy_bottom.stl`,
-      onFileProgress('bottom', 'Loading Dendy_bottom.stl…')).then(() => reportProgress('bottom', 1)),
+    parts.Top.loadURL(`${BASE}${t.top}`,
+      onFileProgress('top', `Loading ${t.top}…`)).then(() => reportProgress('top', 1)),
+    parts.Bottom.loadURL(`${BASE}${t.bottom}`,
+      onFileProgress('bottom', `Loading ${t.bottom}…`)).then(() => reportProgress('bottom', 1)),
   ])
   applyDisplayTransform(parts.Top)
   applyDisplayTransform(parts.Bottom)
+  document.getElementById('credit').innerHTML = t.creditHTML
+  setStatus(`Template: ${name} — ${t.credit}`)
+}
+
+// The Dendy base shells have moulded 0.5 mm label recesses; fill features
+// flatten them so label areas are fully parametric. They only make sense for
+// the Dendy template, so add/remove them when the template changes.
+function syncDendyFillFeatures(templateName) {
+  const isDendy = templateName === 'Dendy (5rw)'
+  for (const part of Object.values(parts)) {
+    for (const f of [...part.features]) {
+      if (!f._dendyFill) continue
+      part.features.splice(part.features.indexOf(f), 1)
+      featureFolderById.get(f.id)?.destroy()
+      featureFolderById.delete(f.id)
+    }
+  }
+  if (!isDendy) return
+  const specs = [
+    [parts.Top, { sizeX: 96, sizeY: 56.6, sizeZ: 2, x: 0, y: 5.1, z: 1, rotZ: 0 }],
+    [parts.Bottom, { sizeX: 107.4, sizeY: 46.8, sizeZ: 2, x: 0, y: 7.5, z: 1, rotZ: 0 }],
+  ]
+  for (const [part, dims] of specs) {
+    const fill = Object.assign(createFeature('Box', part.bounds), {
+      name: 'Fill Base Label Area', op: 'Add', _dendyFill: true, ...dims,
+    })
+    part.features.push(fill)
+    addFeatureFolder(part, fill)
+  }
 }
 
 async function init() {
@@ -518,23 +584,8 @@ async function init() {
   await initManifold()
   reportProgress('wasm', 1, 'Loading base models…')
 
-  await loadDefaults()
-
-  // Default feature setup. The base Dendy shells have moulded 0.5 mm label
-  // recesses; fill them flush so the label areas are fully parametric.
-  const fillTop = Object.assign(createFeature('Box', parts.Top.bounds), {
-    name: 'Fill Base Label Area', op: 'Add',
-    sizeX: 96, sizeY: 56.6, sizeZ: 2, x: 0, y: 5.1, z: 1, rotZ: 0,
-  })
-  parts.Top.features.push(fillTop)
-  addFeatureFolder(parts.Top, fillTop)
-
-  const fillBottom = Object.assign(createFeature('Box', parts.Bottom.bounds), {
-    name: 'Fill Base Label Area', op: 'Add',
-    sizeX: 107.4, sizeY: 46.8, sizeZ: 2, x: 0, y: 7.5, z: 1, rotZ: 0,
-  })
-  parts.Bottom.features.push(fillBottom)
-  addFeatureFolder(parts.Bottom, fillBottom)
+  await loadTemplate(settings.template)
+  syncDendyFillFeatures(settings.template)
 
   // Parametric label recess on the bottom shell's outer face
   const recess = createFeature('Label Recess', parts.Bottom.bounds)
