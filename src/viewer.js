@@ -176,10 +176,11 @@ export class Viewer {
     this.smaaPass.enabled = enabled
   }
 
-  // Enable/disable baked-AO vertex colors on the shared body materials
-  setVertexColors(enabled) {
+  // Apply/remove the baked AO lightmap on the shared body materials
+  setAOMap(texture) {
     for (const mode of ['Simple', 'PBR (HDR)']) {
-      this.materials[mode].vertexColors = enabled
+      this.materials[mode].aoMap = texture
+      this.materials[mode].aoMapIntensity = 1
       this.materials[mode].needsUpdate = true
     }
   }

@@ -8,7 +8,7 @@ import { exportSTL } from './exporter.js'
 import { RecessGizmoManager } from './gizmo.js'
 import { StickerManager } from './sticker.js'
 import { initManifold } from './csg.js'
-import { bakeAO, clearBakedAO, subdivideForAO } from './aobake.js'
+import { bakeAOLightmap } from './aobake.js'
 
 const BASE = import.meta.env.BASE_URL
 const statusEl = document.getElementById('status')
@@ -96,6 +96,7 @@ viewer.modelGroup.add(parts.Top.mesh, parts.Bottom.mesh)
 
 let font = null
 let bakeInProgress = false
+let bakedTexture = null
 
 const featureFolderById = new Map()
 const stickerMgr = new StickerManager()
@@ -115,7 +116,8 @@ const settings = {
   aoIntensity: 1.5,
   exposure: 1,
   antialias: true,
-  bakeSamples: 32,
+  bakeSamples: 16,
+  bakeResolution: 1024,
   bakedAO: false,
   bakeAONow: async () => {
     if (bakeInProgress) return
@@ -125,33 +127,26 @@ const settings = {
     const pct = document.getElementById('bake-pct')
     const bar = document.getElementById('bake-bar')
     box.classList.add('active')
+    label.textContent = `Baking AO lightmap — ${settings.bakeResolution}px, ${settings.bakeSamples} samples`
     try {
       const targets = Object.values(parts).filter((p) => p.baseGeometry)
-      for (let i = 0; i < targets.length; i++) {
-        const part = targets[i]
-        // bake on a subdivided display copy; keep the clean export geometry
-        if (!part.exportGeometry) {
-          part.exportGeometry = part.mesh.geometry
-          part.mesh.geometry = subdivideForAO(part.exportGeometry)
-        }
-        await bakeAO(part.mesh.geometry, {
-          samples: settings.bakeSamples,
-          onProgress: (p) => {
-            const total = (i + p) / targets.length
-            label.textContent = `Baking AO — ${part.name} (${settings.bakeSamples} samples)`
-            pct.textContent = `${Math.round(total * 100)}%`
-            bar.style.width = `${Math.round(total * 100)}%`
-          },
-        })
-      }
-      viewer.applyRenderMode()
+      const tex = await bakeAOLightmap(targets.map((p) => p.mesh.geometry), {
+        resolution: settings.bakeResolution,
+        samples: settings.bakeSamples,
+        onProgress: (p) => {
+          pct.textContent = `${Math.round(p * 100)}%`
+          bar.style.width = `${Math.round(p * 100)}%`
+        },
+      })
+      bakedTexture?.dispose()
+      bakedTexture = tex
       settings.bakedAO = true
-      viewer.setVertexColors(true)
+      viewer.setAOMap(tex)
       gui.controllersRecursive().forEach((c) => c.updateDisplay())
-      setStatus('Baked AO applied (vertex colors)')
+      setStatus(`Baked AO lightmap applied (${settings.bakeResolution}px, ${(tex.userData.bakeMs / 1000).toFixed(1)}s)`)
     } catch (err) {
       console.error(err)
-      viewer.setVertexColors(false)
+      viewer.setAOMap(null)
       setStatus(`AO bake failed: ${err.message}`)
     } finally {
       bakeInProgress = false
@@ -219,13 +214,17 @@ function rebuild(part, immediate = false) {
   const run = () => {
     part.rebuild(font)
     viewer.applyRenderMode()
-    if (settings.bakedAO) {
-      // geometry changed — the baked vertex colors are gone
-      settings.bakedAO = false
-      viewer.setVertexColors(false)
-      gui.controllersRecursive().forEach((c) => c.updateDisplay())
-      setStatus(`${part.name} rebuilt in ${part.lastBuildMs.toFixed(0)} ms — baked AO cleared, re-bake if needed`)
-      return
+    if (bakedTexture) {
+      // geometry changed — atlas UVs and lightmap are stale
+      bakedTexture.dispose()
+      bakedTexture = null
+      viewer.setAOMap(null)
+      if (settings.bakedAO) {
+        settings.bakedAO = false
+        gui.controllersRecursive().forEach((c) => c.updateDisplay())
+        setStatus(`${part.name} rebuilt in ${part.lastBuildMs.toFixed(0)} ms — baked AO cleared, re-bake if needed`)
+        return
+      }
     }
     setStatus(`${part.name} rebuilt in ${part.lastBuildMs.toFixed(0)} ms`)
   }
@@ -270,34 +269,22 @@ fView.add(settings, 'aoIntensity', 0, 3, 0.05).name('AO Intensity').onChange((v)
 fView.add(settings, 'exposure', 0.1, 3, 0.05).name('Exposure').onChange((v) => viewer.setExposure(v))
 fView.add(settings, 'antialias').name('Anti-Aliasing (SMAA)').onChange((v) => viewer.setAntialias(v))
 
-const fBake = fView.addFolder('Baked AO (Raytraced)')
-fBake.add(settings, 'bakeSamples', 8, 128, 8).name('Samples')
+const fBake = fView.addFolder('Baked AO (Lightmap)')
+fBake.add(settings, 'bakeResolution', [512, 1024, 2048]).name('Resolution (px)')
+fBake.add(settings, 'bakeSamples', 8, 64, 8).name('Samples')
 fBake.add(settings, 'bakeAONow').name('⚡ Bake AO Now')
 fBake.add(settings, 'bakedAO').name('Use Baked AO').onChange((v) => {
   if (!v) {
-    viewer.setVertexColors(false)
-    for (const part of Object.values(parts)) {
-      clearBakedAO(part.mesh.geometry)
-      if (part.exportGeometry) {
-        // restore the clean un-subdivided geometry
-        part.mesh.geometry.dispose()
-        part.mesh.geometry = part.exportGeometry
-        part.exportGeometry = null
-      }
-    }
-    viewer.applyRenderMode()
+    viewer.setAOMap(null)
     return
   }
-  // Never enable vertex colors before every part actually has baked colors —
-  // a missing color attribute renders as black
-  const allBaked = Object.values(parts)
-    .every((p) => !p.baseGeometry || p.mesh.geometry.getAttribute('color'))
-  if (allBaked) {
-    viewer.setVertexColors(true)
+  if (bakedTexture) {
+    viewer.setAOMap(bakedTexture)
   } else {
+    // no lightmap yet — bake first, aoMap switches on when it completes
     settings.bakedAO = false
     gui.controllersRecursive().forEach((c) => c.updateDisplay())
-    settings.bakeAONow() // sets bakedAO + vertex colors when done
+    settings.bakeAONow()
   }
 })
 fBake.close()
