@@ -176,10 +176,14 @@ export class Viewer {
     this.smaaPass.enabled = enabled
   }
 
-  // Apply/remove the baked AO lightmap on the shared body materials
+  // Apply/remove the baked AO lightmap on the shared body materials.
+  // Also assigned as .map so the occlusion multiplies DIRECT light too —
+  // aoMap alone only affects ambient/environment light, which made the
+  // bake invisible on lit outer faces in Simple mode.
   setAOMap(texture) {
     for (const mode of ['Simple', 'PBR (HDR)']) {
       this.materials[mode].aoMap = texture
+      this.materials[mode].map = texture
       this.materials[mode].needsUpdate = true
     }
   }

@@ -56,10 +56,16 @@ function applyDisplayTransform(part) {
     part.mesh.position.z = 0
   } else {
     // outer face up (as seen on the finished cartridge); rest on the actual
-    // geometry height so features like the Top Pin don't sink into the floor
+    // geometry height so features like the Top Pin don't sink into the floor.
+    // Before the first CSG rebuild the mesh geometry is still empty — fall
+    // back to the base bounds (an empty bbox is -Infinity).
     part.mesh.rotation.x = Math.PI
-    part.mesh.geometry.computeBoundingBox()
-    part.mesh.position.z = part.mesh.geometry.boundingBox?.max.z ?? part.bounds.max.z
+    let h = part.bounds.max.z
+    if (part.mesh.geometry.attributes.position?.count) {
+      part.mesh.geometry.computeBoundingBox()
+      h = part.mesh.geometry.boundingBox.max.z
+    }
+    part.mesh.position.z = h
   }
   if (settings?.assemble) setAssemblyPose(1)
 }
@@ -345,7 +351,10 @@ function rebuild(part, immediate = false) {
 }
 
 function rebuildAll() {
-  for (const p of Object.values(parts)) p.rebuild(font)
+  for (const p of Object.values(parts)) {
+    p.rebuild(font)
+    applyDisplayTransform(p)
+  }
   viewer.applyRenderMode()
   if (bakedTexture) {
     bakedTexture.dispose()
