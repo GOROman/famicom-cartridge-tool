@@ -23,6 +23,6 @@
     "three-mesh-bvh": "^0.9.13"
   },
   "devDependencies": {
-    "vite": "^8.1.5"
+    "vite": "^8.1.6"
   }
 }
